@@ -13,7 +13,7 @@
     "test:watch": "vitest",
     "db:migrate:local": "wrangler d1 migrations apply guess-the-character-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply guess-the-character-db --remote",
-    "deploy": "npm run build && wrangler pages deploy --project-name=guess-the-character"
+    "deploy": "npm run build && wrangler pages deploy --project-name=gooogn"
   },
   "dependencies": {
     "@hono/zod-validator": "0.9.1",
