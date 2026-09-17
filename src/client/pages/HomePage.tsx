@@ -48,13 +48,8 @@ export default function HomePage() {
   const activeCard = CARDS.find((c) => c.scope === activeScope) ?? null;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-fg">Guess the Character</h1>
-        <p className="text-fg-muted mt-1">Pick a category and start playing.</p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-5">
+    <div className="flex-1 flex items-center justify-center w-full min-h-[calc(100vh-8rem)]">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 w-full max-w-5xl">
         {CARDS.map((card) => (
           <CategoryCard
             key={card.scope}

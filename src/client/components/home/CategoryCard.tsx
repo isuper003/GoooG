@@ -14,9 +14,9 @@ export default function CategoryCard({ title, images, accentClassName, onClick }
     <motion.button
       type="button"
       onClick={onClick}
-      whileHover={{ y: -4, scale: 1.02 }}
+      whileHover={{ y: -6, scale: 1.03 }}
       whileTap={{ scale: 0.98 }}
-      className="group relative aspect-[4/3] w-full overflow-hidden rounded-card border border-bg-hover bg-bg-card text-left"
+      className="group relative aspect-[3/4] w-full overflow-hidden rounded-card border border-bg-hover bg-bg-card text-left shadow-lg transition-shadow hover:shadow-2xl"
     >
       {previewImages.length > 0 ? (
         <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-0.5">
@@ -40,9 +40,9 @@ export default function CategoryCard({ title, images, accentClassName, onClick }
         </div>
       )}
 
-      <div className={`absolute inset-x-0 bottom-0 h-1 ${accentClassName}`} />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-      <div className="absolute bottom-3 left-4 right-4 truncate text-lg sm:text-xl font-bold text-white drop-shadow">
+      <div className={`absolute inset-x-0 bottom-0 h-1.5 ${accentClassName}`} />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+      <div className="absolute bottom-4 left-4 right-4 truncate text-lg sm:text-xl font-bold text-white drop-shadow">
         {title}
       </div>
     </motion.button>
