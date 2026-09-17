@@ -54,7 +54,7 @@ export default function HomePage() {
         <p className="text-fg-muted mt-1">Pick a category and start playing.</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-5">
         {CARDS.map((card) => (
           <CategoryCard
             key={card.scope}

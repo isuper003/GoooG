@@ -42,7 +42,7 @@ export default function CategoryCard({ title, images, accentClassName, onClick }
 
       <div className={`absolute inset-x-0 bottom-0 h-1 ${accentClassName}`} />
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-      <div className="absolute bottom-3 left-4 text-xl font-bold text-white drop-shadow">
+      <div className="absolute bottom-3 left-4 right-4 truncate text-lg sm:text-xl font-bold text-white drop-shadow">
         {title}
       </div>
     </motion.button>
