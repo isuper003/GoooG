@@ -1,10 +1,16 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { categoriesRouter } from './routes/categories';
+import { charactersRouter } from './routes/characters';
+import { labelsRouter } from './routes/labels';
+import { previewsRouter } from './routes/previews';
+import { sessionsRouter } from './routes/sessions';
+import { statsRouter } from './routes/stats';
 
 export type AppEnv = {
   Bindings: {
     DB: D1Database;
+    API_WRITE_SECRET: string;
   };
 };
 
@@ -24,5 +30,22 @@ app.notFound((c) => {
   return c.json({ error: 'Not Found' }, 404);
 });
 
+// Write-protection middleware for mutating endpoints under /api
+app.use('/api/*', async (c, next) => {
+  const method = c.req.method.toUpperCase();
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    const secret = c.req.header('X-App-Secret');
+    if (!secret || secret !== c.env.API_WRITE_SECRET) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+  }
+  await next();
+});
+
 // Mount routes under /api
 app.route('/api/categories', categoriesRouter);
+app.route('/api/characters', charactersRouter);
+app.route('/api/labels', labelsRouter);
+app.route('/api/home-previews', previewsRouter);
+app.route('/api/game-sessions', sessionsRouter);
+app.route('/api/stats', statsRouter);
