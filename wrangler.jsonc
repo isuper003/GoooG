@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "guess-the-character",
+  "compatibility_date": "2026-09-17",
+  "pages_build_output_dir": "./dist",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "guess-the-character-db",
+      "database_id": "982e8432-59ec-44aa-82cd-2fe03d90d1fa",
+      "migrations_dir": "./migrations"
+    }
+  ]
+}
