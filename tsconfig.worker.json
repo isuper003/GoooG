@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["@cloudflare/workers-types"],
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true
+  },
+  "files": [
+    "node_modules/@cloudflare/workers-types/index.d.ts"
+  ],
+  "include": [
+    "functions/**/*",
+    "src/server/**/*",
+    "src/shared/**/*"
+  ]
+}
