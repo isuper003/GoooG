@@ -7,7 +7,7 @@
     {
       "binding": "DB",
       "database_name": "guess-the-character-db",
-      "database_id": "982e8432-59ec-44aa-82cd-2fe03d90d1fa",
+      "database_id": "04bf03ac-ca8d-4632-83e0-aa810fae40ee",
       "migrations_dir": "./migrations"
     }
   ]
