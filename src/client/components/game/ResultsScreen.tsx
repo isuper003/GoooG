@@ -1,4 +1,3 @@
-import { motion } from 'motion/react';
 import type { MissedCharacter } from '../../hooks/useGameSession';
 
 interface ResultsScreenProps {
@@ -13,11 +12,7 @@ export default function ResultsScreen({
   onSkip,
 }: ResultsScreenProps) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-2xl mx-auto flex flex-col gap-6"
-    >
+    <div className="w-full max-w-2xl mx-auto flex flex-col gap-6">
       <div>
         <h2 className="text-2xl font-bold text-fg">Let's review what you missed</h2>
         <p className="text-fg-muted mt-1">
@@ -64,6 +59,6 @@ export default function ResultsScreen({
           Finish without practicing
         </button>
       </div>
-    </motion.div>
+    </div>
   );
 }

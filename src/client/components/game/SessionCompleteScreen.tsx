@@ -1,4 +1,3 @@
-import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
 import type { FinalSummary } from '../../hooks/useGameSession';
 
@@ -10,11 +9,7 @@ export default function SessionCompleteScreen({ summary }: SessionCompleteScreen
   const accuracyPct = Math.round(summary.accuracy * 100);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.96 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="w-full max-w-md mx-auto flex flex-col items-center gap-6 text-center"
-    >
+    <div className="w-full max-w-md mx-auto flex flex-col items-center gap-6 text-center">
       <h2 className="text-3xl font-extrabold text-fg">Session complete!</h2>
 
       <div className="grid grid-cols-2 gap-4 w-full">
@@ -58,6 +53,6 @@ export default function SessionCompleteScreen({ summary }: SessionCompleteScreen
           Gallery
         </Link>
       </div>
-    </motion.div>
+    </div>
   );
 }
