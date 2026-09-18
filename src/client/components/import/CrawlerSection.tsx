@@ -15,6 +15,7 @@ export interface CrawlerQueueItem {
   selectedImages: string[];
   status: 'pending' | 'imported' | 'failed';
   error?: string;
+  isSelected: boolean;
 }
 
 const CATEGORY_OPTIONS: { value: 'trans' | 'sluts' | 'twinks'; label: string }[] = [
@@ -71,6 +72,7 @@ export default function CrawlerSection() {
         availableImages: item.availableImages,
         selectedImages: item.availableImages.slice(0, 6),
         status: 'pending',
+        isSelected: true,
       }));
 
       setQueue(queueItems);
@@ -89,6 +91,10 @@ export default function CrawlerSection() {
     setQueue((prev) =>
       prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
     );
+  }
+
+  function toggleSelectAll(selected: boolean) {
+    setQueue((prev) => prev.map((item) => ({ ...item, isSelected: selected })));
   }
 
   function toggleSelectedImage(item: CrawlerQueueItem, url: string) {
@@ -155,10 +161,14 @@ export default function CrawlerSection() {
     }
   }
 
-  async function handleSaveAllReady() {
+  async function handleSaveSelectedReady() {
     setIsSavingBatch(true);
     const readyItems = queue.filter(
-      (item) => item.status === 'pending' && item.name.trim() && item.selectedImages.length > 0
+      (item) =>
+        item.isSelected &&
+        item.status === 'pending' &&
+        item.name.trim() &&
+        item.selectedImages.length > 0
     );
 
     for (let i = 0; i < readyItems.length; i += SAVE_CONCURRENCY) {
@@ -168,15 +178,18 @@ export default function CrawlerSection() {
     setIsSavingBatch(false);
   }
 
-  // Matches the readyItems filter in handleSaveAllReady — a pending item with
-  // no name or no images never actually gets attempted, so it must not be
-  // counted as "ready" or the counter will never reach 0.
-  const readyCount = queue.filter(
-    (i) => i.status === 'pending' && i.name.trim() && i.selectedImages.length > 0
+  const allSelected = queue.length > 0 && queue.every((i) => i.isSelected);
+  const someSelected = queue.some((i) => i.isSelected);
+  const selectedCount = queue.filter((i) => i.isSelected).length;
+
+  const selectedReadyCount = queue.filter(
+    (i) => i.isSelected && i.status === 'pending' && i.name.trim() && i.selectedImages.length > 0
   ).length;
+
   const stuckCount = queue.filter(
     (i) => i.status === 'pending' && (!i.name.trim() || i.selectedImages.length === 0)
   ).length;
+
 
   return (
     <div className="flex flex-col gap-6">
@@ -234,6 +247,49 @@ export default function CrawlerSection() {
             </div>
           </div>
 
+          {/* Master Checkbox & Selection Controls */}
+          {queue.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-fg-dim">
+                Selection ({selectedCount}/{queue.length})
+              </label>
+              <div className="flex items-center gap-2.5 bg-bg-muted rounded-button border border-bg-hover px-2.5 py-1.5 h-[38px]">
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-fg select-none">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = someSelected && !allSelected;
+                    }}
+                    onChange={(e) => toggleSelectAll(e.target.checked)}
+                    className="w-4 h-4 rounded border-bg-hover accent-category-trans cursor-pointer"
+                    title="Toggle all"
+                  />
+                  <span>All</span>
+                </label>
+                <div className="h-4 w-px bg-bg-hover" />
+                <button
+                  type="button"
+                  onClick={() => toggleSelectAll(true)}
+                  className={`text-xs font-semibold transition-colors ${
+                    allSelected ? 'text-category-trans' : 'text-fg-muted hover:text-fg'
+                  }`}
+                >
+                  Select All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleSelectAll(false)}
+                  className={`text-xs font-semibold transition-colors ${
+                    !someSelected ? 'text-rose-400' : 'text-fg-muted hover:text-fg'
+                  }`}
+                >
+                  Deselect All
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* Start Fetching Button */}
@@ -269,8 +325,8 @@ export default function CrawlerSection() {
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-lg font-bold text-fg">Fetched Characters ({queue.length})</h3>
             <span className="text-sm text-fg-muted">
-              {readyCount} ready to save
-              {stuckCount > 0 ? ` · ${stuckCount} need images added manually` : ''}
+              {selectedReadyCount} selected &amp; ready to save
+              {stuckCount > 0 ? ` · ${stuckCount} need images added` : ''}
             </span>
           </div>
 
@@ -281,79 +337,108 @@ export default function CrawlerSection() {
               );
               
               return (
-                <div key={item.id} className="relative flex flex-col gap-4 p-4 rounded-card border border-bg-hover bg-bg-card shadow-sm hover:border-category-trans/50 transition-colors">
+                <div
+                  key={item.id}
+                  className={`relative flex flex-col gap-3.5 p-4 rounded-card border shadow-sm transition-all ${
+                    item.isSelected
+                      ? 'border-bg-hover bg-bg-card hover:border-category-trans/50'
+                      : 'border-bg-hover/50 bg-bg-card/50 opacity-60 hover:opacity-90'
+                  }`}
+                >
+                  {/* Card Header Row: Checkbox, Profile Avatar, Name, Category Badge, Compact Labels Picker, and Status */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-bg-muted/70 pb-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/* Checkbox per character */}
+                      <label
+                        className="flex items-center cursor-pointer p-1"
+                        title={item.isSelected ? 'Deselect character' : 'Select character'}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={item.isSelected}
+                          onChange={(e) => handleUpdateQueueItem(item.id, { isSelected: e.target.checked })}
+                          className="w-5 h-5 rounded border-2 border-bg-hover accent-category-trans cursor-pointer transition-transform hover:scale-110"
+                        />
+                      </label>
 
-                  {/* Status overlay badge */}
-                  <div className="absolute top-2 right-2 flex gap-2 z-10">
-                    {item.status === 'imported' && (
-                      <span className="rounded-badge bg-emerald-500 px-2 py-0.5 text-[11px] font-bold text-white shadow-md">✓ Saved</span>
-                    )}
-                    {item.status === 'failed' && (
-                      <span className="rounded-badge bg-rose-500 px-2 py-0.5 text-[11px] font-bold text-white shadow-md">✗ Failed</span>
-                    )}
-                    {item.status === 'pending' && item.selectedImages.length === 0 && (
-                      <span className="rounded-badge bg-amber-500 px-2 py-0.5 text-[11px] font-bold text-white shadow-md">
-                        ⚠ No images — add manually
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    {/* Avatar next to the name, pulled from the site as-is */}
-                    <div className="shrink-0">
-                      <div className="aspect-square w-14 h-14 rounded-button overflow-hidden border border-bg-hover bg-bg-muted flex items-center justify-center">
+                      {/* Avatar aligned with name */}
+                      <div className="aspect-square w-14 h-14 rounded-card overflow-hidden border-2 border-bg-hover bg-bg-muted flex items-center justify-center shrink-0 shadow-sm">
                         {item.avatarUrl ? (
-                           <img
-                             src={item.avatarUrl}
-                             alt={item.name}
-                             referrerPolicy="no-referrer"
-                             className="h-full w-full object-cover"
-                           />
+                          <img
+                            src={item.avatarUrl}
+                            alt={item.name}
+                            referrerPolicy="no-referrer"
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.opacity = '0.3';
+                            }}
+                          />
                         ) : (
-                           <span className="text-2xl opacity-50">👤</span>
+                          <span className="text-2xl opacity-50">👤</span>
+                        )}
+                      </div>
+
+                      {/* Name & Category Badge & Duplicate Warning */}
+                      <div className="flex flex-col justify-center gap-0.5 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-base sm:text-lg font-bold text-fg truncate" title={item.name}>
+                            {item.name}
+                          </h4>
+                          <span
+                            className={`rounded-badge px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                              item.categoryKey === 'trans'
+                                ? 'bg-category-trans/20 text-category-trans border border-category-trans/30'
+                                : item.categoryKey === 'sluts'
+                                ? 'bg-category-sluts/20 text-category-sluts border border-category-sluts/30'
+                                : 'bg-category-twinks/20 text-category-twinks border border-category-twinks/30'
+                            }`}
+                          >
+                            {item.categoryKey}
+                          </span>
+                        </div>
+                        {duplicate ? (
+                          <span className="text-[11px] text-amber-400">⚠️ Exists in {duplicate.categoryKey}</span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {/* Label Selector (compact tag-picker, no scrollbar) & Status */}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-dim hidden sm:inline">
+                          Labels:
+                        </span>
+                        <LabelMultiSelect
+                          compact
+                          selectedIds={item.labelIds}
+                          onChange={(ids) => handleUpdateQueueItem(item.id, { labelIds: ids })}
+                        />
+                      </div>
+
+                      {/* Status Badge */}
+                      <div className="flex items-center gap-1.5">
+                        {item.status === 'imported' && (
+                          <span className="rounded-badge bg-emerald-500 px-2.5 py-0.5 text-[11px] font-bold text-white shadow-md">
+                            ✓ Saved
+                          </span>
+                        )}
+                        {item.status === 'failed' && (
+                          <span className="rounded-badge bg-rose-500 px-2.5 py-0.5 text-[11px] font-bold text-white shadow-md">
+                            ✗ Failed
+                          </span>
+                        )}
+                        {item.status === 'pending' && item.selectedImages.length === 0 && (
+                          <span className="rounded-badge bg-amber-500 px-2.5 py-0.5 text-[11px] font-bold text-white shadow-md">
+                            ⚠ No images
+                          </span>
                         )}
                       </div>
                     </div>
-
-                    {/* Details */}
-                    <div className="flex-1 flex flex-col gap-3 min-w-[200px]">
-                      <div className="flex flex-col gap-1">
-                         <h4 className="text-lg font-bold text-fg px-1 py-0.5" title="Pulled from the source site as-is">
-                           {item.name}
-                         </h4>
-                         {duplicate && (
-                           <span className="text-[11px] text-amber-400 px-1">⚠️ Exists in {duplicate.categoryKey}</span>
-                         )}
-                      </div>
-
-                      <div className="flex flex-wrap gap-3">
-                        <div className="flex flex-col gap-1 w-32">
-                          <label className="text-[10px] uppercase text-fg-dim px-1">Category</label>
-                          <select
-                            value={item.categoryKey}
-                            onChange={(e) => handleUpdateQueueItem(item.id, { categoryKey: e.target.value as 'trans' | 'sluts' | 'twinks' })}
-                            className="rounded-badge border border-bg-hover bg-bg-muted px-2 py-1 text-xs font-semibold text-fg focus:outline-none"
-                          >
-                             {CATEGORY_OPTIONS.map((opt) => (
-                               <option key={opt.value} value={opt.value}>{opt.label}</option>
-                             ))}
-                          </select>
-                        </div>
-
-                        <div className="flex flex-col gap-1 flex-1 min-w-[150px]">
-                          <label className="text-[10px] uppercase text-fg-dim px-1">Labels</label>
-                          <LabelMultiSelect
-                             selectedIds={item.labelIds}
-                             onChange={(ids) => handleUpdateQueueItem(item.id, { labelIds: ids })}
-                          />
-                        </div>
-                      </div>
-
-                      {item.error && <span className="text-xs text-rose-400 px-1">{item.error}</span>}
-                    </div>
                   </div>
 
-                  {/* Horizontal album strip — browse and pick from every photo found for this character */}
+                  {item.error && <span className="text-xs text-rose-400 px-1">{item.error}</span>}
+
+                  {/* Horizontal album strip — 30% bigger, no scrollbar, no add URL */}
                   <BottomImageTray
                     availableImages={item.availableImages}
                     selectedImages={item.selectedImages}
@@ -361,34 +446,36 @@ export default function CrawlerSection() {
                     onSetPrimary={(url) => setPrimaryImage(item, url)}
                     onAddImage={(url) => addAvailableImage(item, url)}
                     onRemoveCandidate={(url) => removeCandidateImage(item, url)}
+                    showAddUrl={false}
                   />
                 </div>
               );
             })}
           </div>
 
-          {/* Big Save All Button at the bottom */}
+          {/* Big Save Selected Button at the bottom */}
           <div className="mt-4 flex justify-center sticky bottom-4 z-20">
-             <button
-               type="button"
-               onClick={handleSaveAllReady}
-               disabled={isSavingBatch || readyCount === 0}
-               className="rounded-full bg-emerald-600 hover:bg-emerald-500 px-10 py-4 text-base font-bold text-white shadow-lg transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2"
-             >
-               {isSavingBatch ? (
-                 <>
-                   <span className="inline-block animate-spin">⟳</span>
-                   <span>Saving...</span>
-                 </>
-               ) : (
-                 <>
-                   <span>💾 Save All Ready Characters ({readyCount})</span>
-                 </>
-               )}
-             </button>
+            <button
+              type="button"
+              onClick={handleSaveSelectedReady}
+              disabled={isSavingBatch || selectedReadyCount === 0}
+              className="rounded-full bg-emerald-600 hover:bg-emerald-500 px-10 py-4 text-base font-bold text-white shadow-lg transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2"
+            >
+              {isSavingBatch ? (
+                <>
+                  <span className="inline-block animate-spin">⟳</span>
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <span>💾 Save Selected Characters ({selectedReadyCount})</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       )}
     </div>
   );
 }
+

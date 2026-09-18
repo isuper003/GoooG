@@ -497,6 +497,7 @@ export default function RowByRowReviewer({
             onSetPrimary={setPrimaryImage}
             onAddImage={addAvailableImage}
             onRemoveCandidate={removeCandidateImage}
+            showAddUrl
           />
         </div>
       ) : null}
