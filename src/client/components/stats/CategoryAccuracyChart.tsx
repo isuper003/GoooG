@@ -20,9 +20,9 @@ interface CategoryAccuracyChartProps {
 
 export default function CategoryAccuracyChart({ byCategory }: CategoryAccuracyChartProps) {
   return (
-    <div className="rounded-card border border-bg-hover bg-bg-card p-5 flex flex-col gap-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-fg-dim">
-        Accuracy by category
+    <div className="border-2 border-bg-hover bg-bg-card p-5 flex flex-col gap-4">
+      <h2 className="font-display text-lg font-semibold text-fg">
+        Accuracy by Category
       </h2>
       <div className="flex flex-col gap-3">
         {byCategory.map((cat) => {
@@ -34,13 +34,13 @@ export default function CategoryAccuracyChart({ byCategory }: CategoryAccuracyCh
                 <span className="font-medium text-fg">
                   {CATEGORY_LABELS[cat.category] ?? cat.category}
                 </span>
-                <span className="text-fg-muted">
+                <span className="font-mono text-fg-muted">
                   {total > 0 ? `${pct}% (${cat.correct}/${total})` : 'No data yet'}
                 </span>
               </div>
-              <div className="h-2.5 w-full overflow-hidden rounded-badge bg-bg-muted">
+              <div className="h-2.5 w-full overflow-hidden bg-bg-muted">
                 <div
-                  className={`h-full rounded-badge transition-all duration-300 ${
+                  className={`h-full transition-all duration-300 ${
                     CATEGORY_BAR_CLASSES[cat.category] ?? 'bg-fg-dim'
                   }`}
                   style={{ width: `${total > 0 ? pct : 0}%` }}

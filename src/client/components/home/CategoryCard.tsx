@@ -2,21 +2,29 @@ import { motion } from 'motion/react';
 
 interface CategoryCardProps {
   title: string;
+  tag: string;
   images: string[];
   accentClassName: string;
+  borderClassName: string;
   onClick: () => void;
 }
 
-export default function CategoryCard({ title, images, accentClassName, onClick }: CategoryCardProps) {
+export default function CategoryCard({
+  title,
+  tag,
+  images,
+  accentClassName,
+  borderClassName,
+  onClick,
+}: CategoryCardProps) {
   const previewImages = images.slice(0, 4);
 
   return (
     <motion.button
       type="button"
       onClick={onClick}
-      whileHover={{ y: -6, scale: 1.03 }}
       whileTap={{ scale: 0.98 }}
-      className="group relative aspect-[3/4] w-full overflow-hidden rounded-card border border-bg-hover bg-bg-card text-left shadow-lg transition-shadow hover:shadow-2xl"
+      className={`card-notch group relative aspect-[3/4] w-full overflow-hidden border-2 border-transparent bg-bg-card text-left transition-colors duration-150 ${borderClassName}`}
     >
       {previewImages.length > 0 ? (
         <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-0.5">
@@ -26,7 +34,7 @@ export default function CategoryCard({ title, images, accentClassName, onClick }
                 src={url}
                 alt=""
                 referrerPolicy="no-referrer"
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                className="h-full w-full object-cover"
               />
             </div>
           ))}
@@ -40,10 +48,14 @@ export default function CategoryCard({ title, images, accentClassName, onClick }
         </div>
       )}
 
-      <div className={`absolute inset-x-0 bottom-0 h-1.5 ${accentClassName}`} />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-      <div className="absolute bottom-4 left-4 right-4 truncate text-lg sm:text-xl font-bold text-white drop-shadow">
-        {title}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+
+      <div className={`absolute top-0 left-0 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-white ${accentClassName}`}>
+        {tag}
+      </div>
+
+      <div className="absolute inset-x-0 bottom-0 px-3 py-2.5">
+        <div className="font-display text-lg sm:text-xl font-semibold text-white">{title}</div>
       </div>
     </motion.button>
   );

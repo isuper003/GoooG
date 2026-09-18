@@ -36,8 +36,8 @@ export default function ConfirmDialog({
         className="w-full max-w-sm rounded-card bg-bg-card border border-bg-hover p-6 flex flex-col gap-4"
       >
         <div>
-          <h3 className="text-lg font-bold text-fg">{title}</h3>
-          <p className="text-sm text-fg-muted mt-1">{message}</p>
+          <h3 className="font-display text-xl font-semibold text-fg">{title}</h3>
+          <p className="text-sm text-fg-muted mt-1 leading-relaxed">{message}</p>
         </div>
         <div className="flex gap-3">
           <button

@@ -23,7 +23,7 @@ export default function RemediationScreen({
     <div className="w-full flex flex-col items-center gap-8">
       <div className="w-full max-w-3xl flex items-center justify-between">
         <div className="flex flex-col gap-1">
-          <span className="text-xs uppercase tracking-wider text-fg-dim font-semibold">
+          <span className="font-mono text-xs uppercase tracking-wider text-accent font-semibold">
             Practice round
           </span>
           {progress ? (

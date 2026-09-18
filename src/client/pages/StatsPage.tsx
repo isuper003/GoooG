@@ -17,9 +17,11 @@ export default function StatsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-fg">Statistics</h1>
-        <p className="text-fg-muted mt-1">
-          Your performance, accuracy by category, and SRS progression.
+        <h1 className="font-display text-3xl sm:text-4xl font-semibold text-fg">
+          Statistics
+        </h1>
+        <p className="text-fg-muted mt-1 text-sm">
+          Recognition accuracy ledger, category proficiency, and SRS retention levels.
         </p>
       </div>
 

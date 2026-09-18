@@ -39,16 +39,21 @@ export default function LabelManager({ onClose }: LabelManagerProps) {
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-sm rounded-card bg-bg-card border border-bg-hover p-6 flex flex-col gap-4"
       >
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-fg">Manage labels</h2>
-          <button type="button" onClick={onClose} className="text-sm text-fg-muted hover:text-fg">
+        <div className="flex items-center justify-between border-b border-bg-muted pb-3">
+          <div>
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-accent">
+              Taxonomy Index
+            </span>
+            <h2 className="font-display text-xl font-semibold text-fg">Manage Labels</h2>
+          </div>
+          <button type="button" onClick={onClose} className="text-xs font-mono text-fg-dim hover:text-fg uppercase tracking-wider">
             Close
           </button>
         </div>
 
-        <div className="flex max-h-64 flex-col gap-2 overflow-y-auto">
+        <div className="flex max-h-64 flex-col gap-2 overflow-y-auto no-scrollbar">
           {labels.length === 0 ? (
-            <p className="text-sm text-fg-muted">No labels yet.</p>
+            <p className="text-sm text-fg-muted font-mono">No labels indexed yet.</p>
           ) : (
             labels.map((label) => (
               <div
@@ -106,7 +111,7 @@ export default function LabelManager({ onClose }: LabelManagerProps) {
             type="button"
             onClick={handleCreate}
             disabled={createLabel.isPending}
-            className="rounded-button bg-category-male px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            className="rounded-button bg-accent px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
             Add
           </button>

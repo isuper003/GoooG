@@ -14,21 +14,20 @@ export default function ResultsScreen({
   return (
     <div className="w-full max-w-2xl mx-auto flex flex-col gap-6">
       <div>
-        <h2 className="text-2xl font-bold text-fg">Let's review what you missed</h2>
-        <p className="text-fg-muted mt-1">
-          You missed {missedCharacters.length}{' '}
-          {missedCharacters.length === 1 ? 'character' : 'characters'}. Practice them now to lock
-          them in.
-        </p>
+        <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-accent">
+          {missedCharacters.length} open {missedCharacters.length === 1 ? 'case' : 'cases'}
+        </span>
+        <h2 className="font-display text-2xl font-semibold text-fg mt-1">Let's review what you missed</h2>
+        <p className="text-fg-muted mt-1">Practice them now to lock them in.</p>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {missedCharacters.map((c) => (
           <div
             key={c.id}
-            className="flex flex-col items-center gap-2 rounded-card bg-bg-card p-3 border border-bg-hover"
+            className="flex flex-col items-center gap-2 card-notch bg-bg-card p-3 border-2 border-bg-hover"
           >
-            <div className="w-full aspect-square rounded-button overflow-hidden bg-bg-muted">
+            <div className="w-full aspect-square overflow-hidden bg-bg-muted">
               {c.imageUrl ? (
                 <img
                   src={c.imageUrl}
@@ -47,7 +46,7 @@ export default function ResultsScreen({
         <button
           type="button"
           onClick={onPractice}
-          className="flex-1 rounded-button bg-category-male px-4 py-3 font-semibold text-white transition-opacity hover:opacity-90"
+          className="flex-1 rounded-button bg-accent px-4 py-3 font-semibold text-white transition-opacity hover:opacity-90"
         >
           Practice missed characters
         </button>

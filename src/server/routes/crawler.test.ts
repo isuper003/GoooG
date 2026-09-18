@@ -1,5 +1,27 @@
 import { describe, it, expect } from 'vitest';
-import { extractProfileLinks, extractProfileGallery, upgradeImageResolution } from './crawler';
+import { extractProfileLinks, extractProfileGallery, upgradeImageResolution, slugifyName } from './crawler';
+
+describe('slugifyName', () => {
+  it('lowercases and hyphenates a plain name', () => {
+    expect(slugifyName('Angela White')).toBe('angela-white');
+  });
+
+  it('collapses extra whitespace into a single hyphen', () => {
+    expect(slugifyName('  Little   Caprice  ')).toBe('little-caprice');
+  });
+
+  it('strips apostrophes without leaving a stray hyphen', () => {
+    expect(slugifyName("Rin O'Malley")).toBe('rin-omalley');
+  });
+
+  it('drops other punctuation, replacing it with a hyphen', () => {
+    expect(slugifyName('Jane & Jill')).toBe('jane-jill');
+  });
+
+  it('trims leading/trailing hyphens produced by punctuation at the edges', () => {
+    expect(slugifyName('-Jordan Lee!')).toBe('jordan-lee');
+  });
+});
 
 describe('upgradeImageResolution', () => {
   it('replaces a /460/ path segment with /1280/', () => {

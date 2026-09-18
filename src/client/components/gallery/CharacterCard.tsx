@@ -30,23 +30,21 @@ export default function CharacterCard({
   return (
     <motion.div
       layout
-      className={`flex flex-col overflow-hidden rounded-card border border-bg-hover bg-bg-card transition-opacity ${
+      className={`flex flex-col overflow-hidden bg-bg-card border-2 border-bg-hover transition-opacity ${
         character.isActive ? '' : 'opacity-60'
       }`}
     >
       <button
         type="button"
         onClick={onViewImages}
-        className="relative aspect-square w-full overflow-hidden bg-bg-muted"
+        className="card-notch relative aspect-square w-full overflow-hidden bg-bg-muted"
       >
         {primaryImage ? (
           <img
             src={primaryImage}
             alt={character.name}
             referrerPolicy="no-referrer"
-            className={`h-full w-full object-cover transition-transform duration-200 hover:scale-105 ${
-              character.isActive ? '' : 'grayscale'
-            }`}
+            className={`h-full w-full object-cover ${character.isActive ? '' : 'grayscale'}`}
             onError={(e) => {
               (e.target as HTMLImageElement).style.opacity = '0.2';
             }}
@@ -57,17 +55,17 @@ export default function CharacterCard({
           </div>
         )}
         {!character.isActive ? (
-          <div className="absolute top-2 left-2 rounded-badge bg-black/70 backdrop-blur-sm px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
-            Hidden from game
+          <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-sm px-2 py-0.5 font-mono text-[10px] font-bold text-white uppercase tracking-wider">
+            Sealed
           </div>
         ) : null}
       </button>
 
       <div className="flex flex-col gap-2 p-3">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate font-semibold text-fg">{character.name}</span>
+          <span className="truncate font-display font-semibold text-fg">{character.name}</span>
           <span
-            className={`shrink-0 rounded-badge px-2 py-0.5 text-[10px] font-semibold uppercase ${
+            className={`shrink-0 rounded-badge px-2 py-0.5 font-mono text-[10px] font-semibold uppercase ${
               CATEGORY_CLASSES[character.categoryKey] ?? 'bg-bg-muted text-fg-muted'
             }`}
           >
@@ -88,7 +86,7 @@ export default function CharacterCard({
           </div>
         ) : null}
 
-        <div className="flex items-center gap-3 text-xs text-fg-muted">
+        <div className="flex items-center gap-3 font-mono text-xs text-fg-muted">
           <span className="text-emerald-400">&#10003; {character.correctCount}</span>
           <span className="text-rose-400">&#10007; {character.wrongCount}</span>
           <span>SRS {character.srsLevel}</span>
@@ -109,7 +107,7 @@ export default function CharacterCard({
               : 'Show this character in the game again'
           }
         >
-          {character.isActive ? '👁 Shown in game' : '🚫 Hidden — tap to re-enable'}
+          {character.isActive ? '👁 In rotation' : '🚫 Sealed — tap to reopen'}
         </button>
 
         <div className="mt-1 flex gap-2">

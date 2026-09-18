@@ -50,14 +50,14 @@ export default function ImageLightbox({ images, characterName, onClose }: ImageL
               <button
                 type="button"
                 onClick={() => setIndex((i) => (i - 1 + images.length) % images.length)}
-                className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-badge bg-black/50 text-white hover:bg-black/70"
+                className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70"
               >
                 &larr;
               </button>
               <button
                 type="button"
                 onClick={() => setIndex((i) => (i + 1) % images.length)}
-                className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-badge bg-black/50 text-white hover:bg-black/70"
+                className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70"
               >
                 &rarr;
               </button>
@@ -73,7 +73,7 @@ export default function ImageLightbox({ images, characterName, onClose }: ImageL
                 type="button"
                 onClick={() => setIndex(i)}
                 className={`h-14 w-14 shrink-0 overflow-hidden rounded-button border-2 transition-colors ${
-                  i === index ? 'border-category-male' : 'border-transparent opacity-60'
+                  i === index ? 'border-accent' : 'border-transparent opacity-60'
                 }`}
               >
                 <img src={url} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />

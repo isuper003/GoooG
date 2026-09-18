@@ -73,7 +73,7 @@ export default function ImageUrlListEditor({ value, onChange }: ImageUrlListEdit
               }}
             />
             {i === 0 ? (
-              <span className="absolute top-1 left-1 rounded-badge bg-category-trans px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
+              <span className="absolute top-1 left-1 rounded-badge bg-accent px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
                 Primary
               </span>
             ) : null}

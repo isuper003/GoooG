@@ -11,9 +11,9 @@ export default function SrsDistributionChart({ characters }: SrsDistributionChar
   const maxCount = Math.max(1, ...counts);
 
   return (
-    <div className="rounded-card border border-bg-hover bg-bg-card p-5 flex flex-col gap-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-fg-dim">
-        SRS level distribution
+    <div className="border-2 border-bg-hover bg-bg-card p-5 flex flex-col gap-4">
+      <h2 className="font-display text-lg font-semibold text-fg">
+        SRS Retention Distribution
       </h2>
       <div className="flex items-end justify-between gap-2 h-32">
         {LEVELS.map((level, i) => {
@@ -21,14 +21,14 @@ export default function SrsDistributionChart({ characters }: SrsDistributionChar
           const heightPct = (count / maxCount) * 100;
           return (
             <div key={level} className="flex flex-1 flex-col items-center gap-1.5">
-              <span className="text-xs font-semibold text-fg">{count}</span>
+              <span className="font-mono text-xs font-semibold text-fg">{count}</span>
               <div className="flex h-24 w-full items-end">
                 <div
-                  className="w-full rounded-t-button bg-category-male/70 transition-all duration-300"
+                  className="w-full bg-accent/70 transition-all duration-300"
                   style={{ height: `${count > 0 ? Math.max(heightPct, 6) : 0}%` }}
                 />
               </div>
-              <span className="text-xs text-fg-dim">{level}</span>
+              <span className="font-mono text-xs text-fg-dim">{level}</span>
             </div>
           );
         })}

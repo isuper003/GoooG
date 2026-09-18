@@ -1,33 +1,51 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Design concept: "Case File" — a dossier/evidence-board look for a
+   character-identification game. Cards read like index cards with a folded
+   corner, stats read like a ledger, category tags read like folder-tab
+   labels, and a correct/wrong answer lands like a rubber stamp.
+   --------------------------------------------------------------------------- */
+
 @theme {
-  --color-bg: #0b0f19;
-  --color-bg-card: #111827;
-  --color-bg-nav: #0f172a;
-  --color-bg-muted: #1e293b;
-  --color-bg-hover: #334155;
+  --color-bg: #16130f;
+  --color-bg-card: #1f1a14;
+  --color-bg-nav: #120f0b;
+  --color-bg-muted: #2a231b;
+  --color-bg-hover: #3a3025;
 
-  --color-fg: #f8fafc;
-  --color-fg-muted: #94a3b8;
-  --color-fg-dim: #64748b;
+  --color-fg: #f1ead9;
+  --color-fg-muted: #b3a48c;
+  --color-fg-dim: #7a6d59;
 
-  --color-category-trans: #3b82f6;
-  --color-category-sluts: #ec4899;
-  --color-category-sl: #ec4899;
-  --color-category-twinks: #10b981;
+  /* Primary accent — brass ink-stamp color. Used app-wide for the one
+     recurring highlight (was previously borrowed ad hoc from the "trans"
+     category color, which had nothing to do with being a primary action). */
+  --color-accent: #c98a3a;
 
-  --radius-card: 0.75rem;
-  --radius-button: 0.5rem;
-  --radius-badge: 9999px;
+  /* Folder-tab colors per category — dusty, distinguishable, not a
+     stoplight palette. */
+  --color-category-trans: #6b8f9e;
+  --color-category-sluts: #b6486b;
+  --color-category-sl: #b6486b;
+  --color-category-twinks: #7a9b5c;
 
-  --spacing-nav: 4rem;
+  --radius-card: 0.25rem;
+  --radius-button: 0.25rem;
+  --radius-badge: 0.1875rem;
+
+  --spacing-nav: 4.5rem;
+
+  --font-display: 'Fraunces', ui-serif, Georgia, serif;
+  --font-sans: 'Work Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
 }
 
 body {
   margin: 0;
   background-color: var(--color-bg);
   color: var(--color-fg);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family: var(--font-sans);
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -38,3 +56,46 @@ body {
   scrollbar-width: none;
 }
 
+/* Index-card silhouette: a clipped top-right corner with a small drop-shadow
+   triangle standing in for a folded paper flap. Used on photo cards instead
+   of the generic uniformly-rounded-rectangle-with-shadow default. */
+.card-notch {
+  position: relative;
+  clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%);
+}
+.card-notch::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 22px;
+  height: 22px;
+  background: linear-gradient(135deg, transparent 50%, rgba(0, 0, 0, 0.4) 50%);
+  pointer-events: none;
+}
+
+/* The one deliberate motion moment: a correct/wrong verdict lands like a
+   rubber stamp hitting paper, instead of a generic fade transition. */
+@keyframes stamp-in {
+  0% {
+    transform: scale(2.4) rotate(-16deg);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(0.9) rotate(-3deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(-4deg);
+    opacity: 1;
+  }
+}
+.stamp {
+  animation: stamp-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stamp {
+    animation: none;
+  }
+}

@@ -10,23 +10,28 @@ export default function SessionCompleteScreen({ summary }: SessionCompleteScreen
 
   return (
     <div className="w-full max-w-md mx-auto flex flex-col items-center gap-6 text-center">
-      <h2 className="text-3xl font-extrabold text-fg">Session complete!</h2>
+      <div>
+        <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-accent">
+          Case closed
+        </span>
+        <h2 className="font-display text-3xl font-semibold text-fg mt-1">Session complete</h2>
+      </div>
 
-      <div className="grid grid-cols-2 gap-4 w-full">
-        <div className="rounded-card bg-bg-card border border-bg-hover p-4">
-          <div className="text-3xl font-bold text-fg">{summary.totalRoundsPlayed}</div>
+      <div className="grid grid-cols-2 gap-3 w-full">
+        <div className="bg-bg-card border-2 border-bg-hover p-4">
+          <div className="font-mono text-3xl font-semibold text-fg">{summary.totalRoundsPlayed}</div>
           <div className="text-xs text-fg-muted mt-1">Rounds played</div>
         </div>
-        <div className="rounded-card bg-bg-card border border-bg-hover p-4">
-          <div className="text-3xl font-bold text-fg">{accuracyPct}%</div>
+        <div className="bg-bg-card border-2 border-bg-hover p-4">
+          <div className="font-mono text-3xl font-semibold text-fg">{accuracyPct}%</div>
           <div className="text-xs text-fg-muted mt-1">Accuracy</div>
         </div>
-        <div className="rounded-card bg-bg-card border border-bg-hover p-4">
-          <div className="text-3xl font-bold text-emerald-400">{summary.totalCorrect}</div>
+        <div className="bg-bg-card border-2 border-bg-hover p-4">
+          <div className="font-mono text-3xl font-semibold text-emerald-400">{summary.totalCorrect}</div>
           <div className="text-xs text-fg-muted mt-1">Correct</div>
         </div>
-        <div className="rounded-card bg-bg-card border border-bg-hover p-4">
-          <div className="text-3xl font-bold text-rose-400">{summary.totalWrong}</div>
+        <div className="bg-bg-card border-2 border-bg-hover p-4">
+          <div className="font-mono text-3xl font-semibold text-rose-400">{summary.totalWrong}</div>
           <div className="text-xs text-fg-muted mt-1">Wrong</div>
         </div>
       </div>
@@ -42,7 +47,7 @@ export default function SessionCompleteScreen({ summary }: SessionCompleteScreen
       <div className="flex gap-3 w-full">
         <Link
           to="/"
-          className="flex-1 rounded-button bg-category-male px-4 py-3 font-semibold text-white text-center transition-opacity hover:opacity-90"
+          className="flex-1 rounded-button bg-accent px-4 py-3 font-semibold text-white text-center transition-opacity hover:opacity-90"
         >
           Home
         </Link>

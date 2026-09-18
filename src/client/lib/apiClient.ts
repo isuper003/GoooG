@@ -138,18 +138,27 @@ export const apiClient = {
     }),
 
   crawlUrl: (url: string, categoryKey: 'trans' | 'sluts' | 'twinks' = 'sluts') =>
-    request<{
-      url: string;
-      categoryKey: 'trans' | 'sluts' | 'twinks';
-      totalFound: number;
-      items: Array<{
-        name: string;
-        avatarUrl?: string;
-        categoryKey: 'trans' | 'sluts' | 'twinks';
-        availableImages: string[];
-      }>;
-    }>('/api/crawler/fetch', {
+    request<CrawlResponse>('/api/crawler/fetch', {
       method: 'POST',
       body: JSON.stringify({ url, categoryKey }),
     }),
+
+  crawlByNames: (names: string[], categoryKey: 'trans' | 'sluts' | 'twinks' = 'sluts') =>
+    request<CrawlResponse>('/api/crawler/fetch-by-name', {
+      method: 'POST',
+      body: JSON.stringify({ names, categoryKey }),
+    }),
 };
+
+interface CrawledItem {
+  name: string;
+  avatarUrl?: string;
+  categoryKey: 'trans' | 'sluts' | 'twinks';
+  availableImages: string[];
+}
+
+interface CrawlResponse {
+  categoryKey: 'trans' | 'sluts' | 'twinks';
+  totalFound: number;
+  items: CrawledItem[];
+}

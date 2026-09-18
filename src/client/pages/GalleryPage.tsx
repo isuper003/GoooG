@@ -42,22 +42,33 @@ export default function GalleryPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-fg">Gallery</h1>
-        <p className="text-fg-muted mt-1">Browse and manage your collection of characters.</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl sm:text-4xl font-semibold text-fg">
+            Gallery
+          </h1>
+          <p className="text-fg-muted mt-1 text-sm">
+            Browse, inspect, and organize character case files.
+          </p>
+        </div>
+        {!isLoading && (
+          <span className="font-mono text-xs font-medium text-fg-dim border border-bg-hover bg-bg-card px-3 py-1 rounded-badge">
+            {characters.length} {characters.length === 1 ? 'record' : 'records'} on file
+          </span>
+        )}
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center bg-bg-card border border-bg-hover p-3 rounded-card shadow-sm">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name..."
-          className="flex-1 min-w-[10rem] rounded-button border border-bg-hover bg-bg-card px-3 py-2 text-sm text-fg"
+          placeholder="Search by character name..."
+          className="flex-1 min-w-[10rem] rounded-button border border-bg-hover bg-bg-muted px-3 py-2 text-sm text-fg placeholder:text-fg-dim focus:border-accent focus:outline-none"
         />
         <select
           value={category ?? ''}
           onChange={(e) => setCategory((e.target.value || undefined) as CategoryFilter)}
-          className="rounded-button border border-bg-hover bg-bg-card px-3 py-2 text-sm text-fg"
+          className="rounded-button border border-bg-hover bg-bg-muted px-3 py-2 text-sm font-medium text-fg focus:border-accent focus:outline-none"
         >
           <option value="">All categories</option>
           <option value="trans">Trans</option>
@@ -67,7 +78,7 @@ export default function GalleryPage() {
         <select
           value={labelFilter ?? ''}
           onChange={(e) => setLabelFilter(e.target.value ? Number(e.target.value) : undefined)}
-          className="rounded-button border border-bg-hover bg-bg-card px-3 py-2 text-sm text-fg"
+          className="rounded-button border border-bg-hover bg-bg-muted px-3 py-2 text-sm font-medium text-fg focus:border-accent focus:outline-none"
         >
           <option value="">All labels</option>
           {labels.map((label) => (
@@ -79,38 +90,46 @@ export default function GalleryPage() {
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as CharacterSort)}
-          className="rounded-button border border-bg-hover bg-bg-card px-3 py-2 text-sm text-fg"
+          className="rounded-button border border-bg-hover bg-bg-muted px-3 py-2 text-sm font-medium text-fg focus:border-accent focus:outline-none"
         >
           <option value="newest">Newest</option>
           <option value="oldest">Oldest</option>
           <option value="category">Category</option>
           <option value="most_correct">Most correct</option>
           <option value="least_correct">Least correct</option>
-          <option value="weakest">Weakest</option>
+          <option value="weakest">Weakest first</option>
         </select>
         <button
           type="button"
           onClick={() => setShowLabelManager(true)}
-          className="whitespace-nowrap rounded-button bg-bg-muted px-3 py-2 text-sm font-medium text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg"
+          className="whitespace-nowrap rounded-button bg-bg-muted px-3 py-2 text-sm font-semibold text-fg-muted transition-colors hover:bg-bg-hover hover:text-fg border border-bg-hover"
         >
-          Manage labels
+          🏷️ Manage labels
         </button>
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-fg-muted">Loading...</p>
+        <div className="flex items-center justify-center py-20 text-fg-dim font-mono text-sm">
+          Searching archives...
+        </div>
       ) : characters.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-16 text-center">
+        <div className="flex flex-col items-center gap-3 py-20 text-center border-2 border-dashed border-bg-hover rounded-card p-8">
           {debouncedSearch || category || labelFilter ? (
-            <p className="text-fg-muted">No characters match these filters.</p>
+            <>
+              <p className="font-display text-lg text-fg">No matching case files</p>
+              <p className="text-sm text-fg-muted">Try adjusting or clearing your search filters.</p>
+            </>
           ) : (
             <>
-              <p className="text-fg-muted">No characters yet &mdash; add some in Smart Import.</p>
+              <p className="font-display text-xl text-fg">No character records on file</p>
+              <p className="text-sm text-fg-muted max-w-sm">
+                Add characters via the Web Crawler or by name to begin building the archive.
+              </p>
               <Link
                 to="/import"
-                className="rounded-button bg-category-trans px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                className="mt-2 rounded-button bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-opacity hover:opacity-90"
               >
-                Go to Smart Import
+                Go to Importer
               </Link>
             </>
           )}

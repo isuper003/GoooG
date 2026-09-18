@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { apiClient, ApiError } from '../../lib/apiClient';
-import { DEFAULT_CATEGORY_SOURCE_URLS } from '../../config/crawlerConfig';
 import { useCharacters } from '../../hooks/useCharacters';
 import { useCrawlerQueue } from '../../hooks/useCrawlerQueue';
 import type { CrawlerQueueItem } from './CrawledCharacterCard';
@@ -13,9 +12,9 @@ const CATEGORY_OPTIONS: { value: 'trans' | 'sluts' | 'twinks'; label: string }[]
   { value: 'twinks', label: 'Twinks' },
 ];
 
-export default function CrawlerSection() {
-  const [activeCategory, setActiveCategory] = useState<'trans' | 'sluts' | 'twinks'>('sluts');
-  const [page, setPage] = useState<number>(1);
+export default function CrawlByNameSection() {
+  const [namesText, setNamesText] = useState('');
+  const [category, setCategory] = useState<'trans' | 'sluts' | 'twinks'>('sluts');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -34,38 +33,33 @@ export default function CrawlerSection() {
     stuckCount,
   } = useCrawlerQueue();
 
-  const currentTemplate = DEFAULT_CATEGORY_SOURCE_URLS[activeCategory] || '';
-
   async function handleCrawl() {
     setErrorMessage(null);
-    if (!currentTemplate.trim()) {
-      setErrorMessage(`No source URL is configured for ${activeCategory} in crawlerConfig.ts.`);
+    const names = namesText
+      .split(/\r?\n/)
+      .map((n) => n.trim())
+      .filter(Boolean);
+
+    if (names.length === 0) {
+      setErrorMessage('Enter at least one character name, one per line.');
       return;
     }
 
-    const urlToFetch = currentTemplate.includes('{page}')
-      ? currentTemplate.replace(/\{page\}/g, String(page))
-      : page > 1
-      ? `${currentTemplate}${currentTemplate.includes('?') ? '&' : '?'}page=${page}`
-      : currentTemplate;
-
     setIsLoading(true);
-
     try {
-      const response = await apiClient.crawlUrl(urlToFetch, activeCategory);
+      const response = await apiClient.crawlByNames(names, category);
 
       if (!response.items || response.items.length === 0) {
-        setErrorMessage(`No characters found at ${urlToFetch}.`);
+        setErrorMessage('No characters found.');
         setIsLoading(false);
         return;
       }
 
-      // Auto-select the first 6 gallery images; the rest stay browsable in the tray
       const queueItems: CrawlerQueueItem[] = response.items.map((item, idx) => ({
-        id: `crawled-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
+        id: `byname-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
         name: item.name,
         avatarUrl: item.avatarUrl || '',
-        categoryKey: activeCategory,
+        categoryKey: category,
         labelIds: [],
         availableImages: item.availableImages,
         selectedImages: item.availableImages.slice(0, 6),
@@ -73,7 +67,8 @@ export default function CrawlerSection() {
         isSelected: true,
       }));
 
-      loadQueue(queueItems);
+      loadQueue(queueItems, true);
+      setNamesText('');
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         setErrorMessage(`Crawl error (${err.status}): ${err.message}`);
@@ -88,16 +83,39 @@ export default function CrawlerSection() {
   return (
     <div className="flex flex-col gap-6">
       {/* Top Bar */}
-      <div className="rounded-card border border-bg-hover bg-bg-card p-4 flex flex-wrap items-end justify-between gap-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-4 flex-1">
-          {/* Category Select */}
+      <div className="rounded-card border border-bg-hover bg-bg-card p-4 flex flex-col gap-4 shadow-sm">
+        <div>
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-accent">
+            Targeted Investigation
+          </span>
+          <h2 className="font-display text-xl font-semibold text-fg mt-0.5">🔎 Lookup by Character Name</h2>
+          <p className="text-xs text-fg-muted mt-0.5">
+            Paste one character name per line &mdash; each one is looked up directly on their own profile
+            page for the real avatar and photo album.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+          <div className="flex flex-col gap-1.5 flex-1 w-full">
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-fg-dim">
+              Names (one per line)
+            </label>
+            <textarea
+              rows={4}
+              value={namesText}
+              onChange={(e) => setNamesText(e.target.value)}
+              placeholder={'Angela White\nAbella Danger\nRiley Reid'}
+              className="w-full rounded-button border border-bg-hover bg-bg-muted p-3 font-mono text-xs text-fg placeholder:text-fg-dim focus:border-accent focus:outline-none"
+            />
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold uppercase tracking-wider text-fg-dim">
               Category
             </label>
             <select
-              value={activeCategory}
-              onChange={(e) => setActiveCategory(e.target.value as 'trans' | 'sluts' | 'twinks')}
+              value={category}
+              onChange={(e) => setCategory(e.target.value as 'trans' | 'sluts' | 'twinks')}
               className="rounded-button border border-bg-hover bg-bg-muted px-3 py-2 text-sm font-bold text-fg focus:outline-none focus:border-accent"
             >
               {CATEGORY_OPTIONS.map((opt) => (
@@ -108,65 +126,32 @@ export default function CrawlerSection() {
             </select>
           </div>
 
-          {/* Page Input */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-fg-dim">
-              Page
-            </label>
-            <div className="flex items-center gap-1 bg-bg-muted rounded-button border border-bg-hover px-1 py-1">
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1 || isLoading}
-                className="rounded-button hover:bg-bg-hover px-2 py-1 text-xs font-bold text-fg disabled:opacity-40"
-              >
-                &minus;
-              </button>
-              <input
-                type="number"
-                min={1}
-                value={page}
-                onChange={(e) => setPage(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                className="w-12 bg-transparent text-center text-sm font-bold text-fg focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => setPage((p) => p + 1)}
-                disabled={isLoading}
-                className="rounded-button hover:bg-bg-hover px-2 py-1 text-xs font-bold text-fg disabled:opacity-40"
-              >
-                +
-              </button>
-            </div>
-          </div>
-
-          <QueueSelectionBar
-            total={queue.length}
-            selectedCount={selectedCount}
-            allSelected={allSelected}
-            someSelected={someSelected}
-            onToggleAll={toggleSelectAll}
-          />
+          <button
+            type="button"
+            onClick={handleCrawl}
+            disabled={isLoading || !namesText.trim()}
+            className="shrink-0 rounded-button bg-accent hover:opacity-90 px-6 py-2.5 text-sm font-bold text-white shadow-md transition-all disabled:opacity-50 flex items-center gap-2"
+          >
+            {isLoading ? (
+              <>
+                <span className="inline-block animate-spin">⟳</span>
+                <span>Fetching...</span>
+              </>
+            ) : (
+              <>
+                <span>🔎 Crawl Names</span>
+              </>
+            )}
+          </button>
         </div>
 
-        {/* Start Fetching Button */}
-        <button
-          type="button"
-          onClick={handleCrawl}
-          disabled={isLoading || !currentTemplate.trim()}
-          className="shrink-0 rounded-button bg-accent hover:opacity-90 px-6 py-2.5 text-sm font-bold text-white shadow-md transition-all disabled:opacity-50 flex items-center gap-2"
-        >
-          {isLoading ? (
-            <>
-              <span className="inline-block animate-spin">⟳</span>
-              <span>Fetching...</span>
-            </>
-          ) : (
-            <>
-              <span>🚀 Start Fetching</span>
-            </>
-          )}
-        </button>
+        <QueueSelectionBar
+          total={queue.length}
+          selectedCount={selectedCount}
+          allSelected={allSelected}
+          someSelected={someSelected}
+          onToggleAll={toggleSelectAll}
+        />
       </div>
 
       {errorMessage && (
@@ -179,10 +164,10 @@ export default function CrawlerSection() {
       {queue.length > 0 && (
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="font-display text-xl font-semibold text-fg">Fetched Characters ({queue.length})</h3>
+            <h3 className="font-display text-xl font-semibold text-fg">Looked Up Characters ({queue.length})</h3>
             <span className="font-mono text-xs text-fg-dim">
               {selectedReadyCount} selected &amp; ready to save
-              {stuckCount > 0 ? ` · ${stuckCount} need images added` : ''}
+              {stuckCount > 0 ? ` · ${stuckCount} not found or need images added` : ''}
             </span>
           </div>
 

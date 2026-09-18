@@ -70,14 +70,21 @@ export default function CharacterEditModal({ character, onClose }: CharacterEdit
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-lg rounded-card bg-bg-card border border-bg-hover p-6 flex flex-col gap-5"
       >
-        <h2 className="text-xl font-bold text-fg">Edit character</h2>
+        <div>
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-accent">
+            Case Record #{character.id}
+          </span>
+          <h2 className="font-display text-2xl font-semibold text-fg mt-0.5">
+            Edit Character File
+          </h2>
+        </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold uppercase tracking-wider text-fg-dim">Name</label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-fg-dim">Character Name</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="rounded-button border border-bg-hover bg-bg-muted px-3 py-2 text-sm text-fg"
+            className="rounded-button border border-bg-hover bg-bg-muted px-3 py-2 text-sm text-fg focus:border-accent focus:outline-none"
           />
           {duplicateWarning ? (
             <span className="text-xs text-amber-400">{duplicateWarning}</span>
@@ -91,7 +98,7 @@ export default function CharacterEditModal({ character, onClose }: CharacterEdit
           <select
             value={categoryKey}
             onChange={(e) => setCategoryKey(e.target.value as 'trans' | 'sluts' | 'twinks')}
-            className="rounded-button border border-bg-hover bg-bg-muted px-3 py-2 text-sm text-fg"
+            className="rounded-button border border-bg-hover bg-bg-muted px-3 py-2 text-sm font-medium text-fg focus:border-accent focus:outline-none"
           >
             {CATEGORY_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -103,11 +110,13 @@ export default function CharacterEditModal({ character, onClose }: CharacterEdit
 
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold uppercase tracking-wider text-fg-dim">Labels</label>
-          <LabelMultiSelect selectedIds={labelIds} onChange={setLabelIds} />
+          <LabelMultiSelect compact selectedIds={labelIds} onChange={setLabelIds} />
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold uppercase tracking-wider text-fg-dim">Images</label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-fg-dim">
+            Images (1&ndash;6 URLs)
+          </label>
           <ImageUrlListEditor value={images} onChange={setImages} />
         </div>
 
@@ -129,7 +138,7 @@ export default function CharacterEditModal({ character, onClose }: CharacterEdit
             type="button"
             onClick={handleSave}
             disabled={updateCharacter.isPending}
-            className="flex-1 rounded-button bg-category-trans px-4 py-2.5 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="flex-1 rounded-button bg-accent px-4 py-2.5 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {updateCharacter.isPending ? 'Saving...' : 'Save changes'}
           </button>

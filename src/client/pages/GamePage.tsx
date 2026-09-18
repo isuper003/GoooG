@@ -33,16 +33,15 @@ export default function GamePage() {
   if (!isGameLocationState(location.state)) {
     return (
       <div className="flex flex-col items-center gap-4 text-center py-16">
-        <h1 className="text-2xl font-bold text-fg">No active game</h1>
-        <p className="text-fg-muted max-w-sm">
-          Looks like there's no game in progress. Head back home and pick a category to start
-          playing.
+        <h1 className="font-display text-3xl font-semibold text-fg">No game in progress</h1>
+        <p className="text-fg-muted max-w-sm text-sm">
+          Head back home and pick a category to start playing.
         </p>
         <Link
           to="/"
-          className="rounded-button bg-category-trans px-5 py-2.5 font-semibold text-white transition-opacity hover:opacity-90"
+          className="rounded-button bg-accent px-5 py-2.5 font-semibold text-white transition-opacity hover:opacity-90"
         >
-          Back to Home
+          Back to home
         </Link>
       </div>
     );
@@ -76,7 +75,7 @@ function ActiveGame({ state }: { state: GameLocationState }) {
             className="w-full flex flex-col items-center gap-6"
           >
             <div className="w-full max-w-3xl flex items-center justify-between">
-              <span className="text-sm font-medium text-fg-muted">
+              <span className="font-mono text-xs font-semibold text-fg-dim border border-bg-hover bg-bg-card px-3 py-1 rounded-badge">
                 {game.plannedRounds === null
                   ? `Round ${game.roundNumber}`
                   : `Round ${game.roundNumber} of ${game.plannedRounds}`}

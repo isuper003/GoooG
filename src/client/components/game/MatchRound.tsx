@@ -30,21 +30,21 @@ export default function MatchRound({
 
   return (
     <div className="flex flex-col items-center gap-8 w-full max-w-3xl mx-auto">
-      <h2 className="text-2xl font-bold text-fg text-center">{promptName}</h2>
+      <h2 className="font-display text-2xl font-semibold text-fg text-center">{promptName}</h2>
 
       <div className="flex flex-col sm:flex-row gap-6 w-full justify-center">
         {tiles.map((tile) => {
           const isCorrectTile = tile.characterId === correctCharacterId;
           const isSelected = tile.characterId === selectedCharacterId;
 
-          let ringClasses = 'border-transparent hover:border-bg-hover';
+          let ringClasses = 'border-bg-hover hover:border-accent/60';
           if (isAnswered) {
             if (isCorrectTile) {
               ringClasses = 'border-emerald-500 ring-2 ring-emerald-500/50';
             } else if (isSelected) {
               ringClasses = 'border-rose-500 ring-2 ring-rose-500/50 opacity-70';
             } else {
-              ringClasses = 'border-transparent opacity-40';
+              ringClasses = 'border-bg-hover opacity-40';
             }
           }
 
@@ -55,7 +55,7 @@ export default function MatchRound({
               disabled={isAnswered}
               onClick={() => onSelect(tile.characterId)}
               whileTap={{ scale: isAnswered ? 1 : 0.97 }}
-              className={`w-full sm:w-56 aspect-square rounded-card overflow-hidden border-2 bg-bg-muted transition-all duration-150 ${ringClasses}`}
+              className={`relative w-full sm:w-56 aspect-square card-notch overflow-hidden border-2 bg-bg-muted transition-all duration-150 ${ringClasses}`}
             >
               {tile.imageUrl ? (
                 <img
@@ -72,6 +72,12 @@ export default function MatchRound({
                   No image
                 </div>
               )}
+
+              {isAnswered && isCorrectTile ? (
+                <div className="stamp absolute top-3 right-3 border-4 border-emerald-500 px-3 py-1 font-display text-base font-bold uppercase text-emerald-400">
+                  Match
+                </div>
+              ) : null}
             </motion.button>
           );
         })}

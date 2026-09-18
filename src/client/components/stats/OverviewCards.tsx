@@ -18,9 +18,9 @@ export default function OverviewCards({ stats }: OverviewCardsProps) {
       {tiles.map((tile) => (
         <div
           key={tile.label}
-          className="rounded-card border border-bg-hover bg-bg-card p-5 flex flex-col gap-1"
+          className="border-2 border-bg-hover bg-bg-card p-5 flex flex-col gap-1"
         >
-          <span className="text-3xl font-bold text-fg">{tile.value}</span>
+          <span className="font-mono text-3xl font-semibold text-fg">{tile.value}</span>
           <span className="text-xs uppercase tracking-wider text-fg-dim font-semibold">
             {tile.label}
           </span>

@@ -146,7 +146,7 @@ export default function BottomImageTray({
                   className={`group relative shrink-0 aspect-square w-32 sm:w-36 overflow-hidden rounded-button border-2 transition-all cursor-pointer ${
                     isSelected
                       ? isPrimary
-                        ? 'border-category-trans ring-2 ring-category-trans/40 shadow-md shadow-category-trans/20'
+                        ? 'border-accent ring-2 ring-accent/40 shadow-md shadow-accent/20'
                         : 'border-emerald-400 ring-1 ring-emerald-400/40'
                       : 'border-bg-hover hover:border-fg-dim opacity-70 hover:opacity-100'
                   }`}
@@ -168,7 +168,7 @@ export default function BottomImageTray({
                   {isSelected ? (
                     <div
                       className={`absolute top-1 left-1 flex items-center justify-center rounded-badge px-2 py-0.5 text-xs font-bold text-white shadow-sm ${
-                        isPrimary ? 'bg-category-trans' : 'bg-emerald-500'
+                        isPrimary ? 'bg-accent' : 'bg-emerald-500'
                       }`}
                     >
                       {isPrimary ? '★ Primary' : `#${selectedIdx + 1}`}
@@ -188,7 +188,7 @@ export default function BottomImageTray({
                       <button
                         type="button"
                         onClick={() => onSetPrimary(url)}
-                        className="text-[11px] font-semibold text-category-trans hover:underline"
+                        className="text-[11px] font-semibold text-accent hover:underline"
                       >
                         Make primary
                       </button>
@@ -239,7 +239,7 @@ export default function BottomImageTray({
                 }
               }}
               placeholder="Paste another image URL for this character..."
-              className="flex-1 rounded-button border border-bg-hover bg-bg-muted px-3 py-1.5 text-xs text-fg placeholder:text-fg-dim focus:border-category-trans focus:outline-none"
+              className="flex-1 rounded-button border border-bg-hover bg-bg-muted px-3 py-1.5 text-xs text-fg placeholder:text-fg-dim focus:border-accent focus:outline-none"
             />
             <button
               type="button"

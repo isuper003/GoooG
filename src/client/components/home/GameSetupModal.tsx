@@ -71,8 +71,13 @@ export default function GameSetupModal({ scope, scopeLabel, onClose }: GameSetup
           className="w-full max-w-md rounded-card bg-bg-card border border-bg-hover p-6 flex flex-col gap-6"
         >
           <div>
-            <h2 className="text-xl font-bold text-fg">Play &mdash; {scopeLabel}</h2>
-            <p className="text-sm text-fg-muted mt-1">Set up your round.</p>
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-accent">
+              Session Configuration
+            </span>
+            <h2 className="font-display text-2xl font-semibold text-fg mt-0.5">
+              Open File &mdash; {scopeLabel}
+            </h2>
+            <p className="text-sm text-fg-muted mt-1">Configure your investigation round parameters.</p>
           </div>
 
           <div>
@@ -87,7 +92,7 @@ export default function GameSetupModal({ scope, scopeLabel, onClose }: GameSetup
                   onClick={() => setPlannedRounds(opt.value)}
                   className={`rounded-button px-4 py-2 text-sm font-semibold transition-colors ${
                     plannedRounds === opt.value
-                      ? 'bg-category-trans text-white'
+                      ? 'bg-accent text-white'
                       : 'bg-bg-muted text-fg-muted hover:bg-bg-hover hover:text-fg'
                   }`}
                 >
@@ -107,7 +112,7 @@ export default function GameSetupModal({ scope, scopeLabel, onClose }: GameSetup
                 onClick={() => setMode('classic')}
                 className={`rounded-button border px-4 py-3 text-left transition-colors ${
                   mode === 'classic'
-                    ? 'border-category-trans bg-category-trans/10'
+                    ? 'border-accent bg-accent/10'
                     : 'border-bg-hover bg-bg-muted hover:bg-bg-hover'
                 }`}
               >
@@ -119,7 +124,7 @@ export default function GameSetupModal({ scope, scopeLabel, onClose }: GameSetup
                 onClick={() => setMode('match')}
                 className={`rounded-button border px-4 py-3 text-left transition-colors ${
                   mode === 'match'
-                    ? 'border-category-trans bg-category-trans/10'
+                    ? 'border-accent bg-accent/10'
                     : 'border-bg-hover bg-bg-muted hover:bg-bg-hover'
                 }`}
               >
@@ -147,7 +152,7 @@ export default function GameSetupModal({ scope, scopeLabel, onClose }: GameSetup
               type="button"
               onClick={handleStart}
               disabled={isStarting}
-              className="flex-1 rounded-button bg-category-trans px-4 py-2.5 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="flex-1 rounded-button bg-accent px-4 py-2.5 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {isStarting ? 'Starting...' : 'Start'}
             </button>

@@ -96,13 +96,13 @@ export default function LabelMultiSelect({
         {selectedLabels.map((label) => (
           <span
             key={label.id}
-            className="inline-flex items-center gap-1 rounded-badge bg-category-trans/20 border border-category-trans/40 text-category-trans px-2 py-0.5 text-xs font-semibold"
+            className="inline-flex items-center gap-1 rounded-badge bg-accent/20 border border-accent/40 text-accent px-2 py-0.5 text-xs font-semibold"
           >
             <span>{label.name}</span>
             <button
               type="button"
               onClick={() => toggle(label.id)}
-              className="ml-0.5 text-category-trans/70 hover:text-white transition-colors"
+              className="ml-0.5 text-accent/70 hover:text-white transition-colors"
               title="Remove label"
             >
               &times;
@@ -155,7 +155,7 @@ export default function LabelMultiSelect({
                 }
               }}
               placeholder="Filter or create label..."
-              className="w-full rounded-button border border-bg-hover bg-bg-muted px-2.5 py-1 text-xs text-fg placeholder:text-fg-dim focus:border-category-trans focus:outline-none"
+              className="w-full rounded-button border border-bg-hover bg-bg-muted px-2.5 py-1 text-xs text-fg placeholder:text-fg-dim focus:border-accent focus:outline-none"
             />
 
             {/* Label List without scrollbar */}
@@ -170,12 +170,12 @@ export default function LabelMultiSelect({
                       onClick={() => toggle(label.id)}
                       className={`flex items-center justify-between rounded-button px-2 py-1 text-xs transition-colors text-left ${
                         isChecked
-                          ? 'bg-category-trans/20 text-category-trans font-bold'
+                          ? 'bg-accent/20 text-accent font-bold'
                           : 'hover:bg-bg-hover text-fg'
                       }`}
                     >
                       <span className="truncate">{label.name}</span>
-                      {isChecked ? <span className="text-category-trans font-bold">✓</span> : null}
+                      {isChecked ? <span className="text-accent font-bold">✓</span> : null}
                     </button>
                   );
                 })
@@ -193,7 +193,7 @@ export default function LabelMultiSelect({
                   type="button"
                   onClick={() => handleCreate(searchQuery)}
                   disabled={createLabel.isPending}
-                  className="w-full rounded-button bg-category-trans/20 hover:bg-category-trans/30 border border-category-trans/40 px-2 py-1 text-xs font-semibold text-category-trans transition-colors text-left truncate"
+                  className="w-full rounded-button bg-accent/20 hover:bg-accent/30 border border-accent/40 px-2 py-1 text-xs font-semibold text-accent transition-colors text-left truncate"
                 >
                   + Create &ldquo;{searchQuery.trim()}&rdquo;
                 </button>
@@ -220,7 +220,7 @@ export default function LabelMultiSelect({
                 onClick={() => toggle(label.id)}
                 className={`rounded-badge px-3 py-1 text-xs font-medium transition-colors ${
                   selected
-                    ? 'bg-category-trans text-white'
+                    ? 'bg-accent text-white'
                     : 'bg-bg-muted text-fg-muted hover:bg-bg-hover hover:text-fg'
                 }`}
               >

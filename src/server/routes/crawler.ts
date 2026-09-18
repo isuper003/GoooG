@@ -10,6 +10,11 @@ const crawlerFetchSchema = z.object({
   categoryKey: z.enum(['trans', 'sluts', 'twinks']).default('sluts'),
 });
 
+const crawlerFetchByNameSchema = z.object({
+  names: z.array(z.string().trim().min(1)).min(1).max(40),
+  categoryKey: z.enum(['trans', 'sluts', 'twinks']).default('sluts'),
+});
+
 export interface ExtractedItem {
   name: string;
   avatarUrl: string; // Profile image
@@ -36,6 +41,22 @@ const FETCH_HEADERS = {
 const MAX_PROFILES_PER_CRAWL = 40;
 const PROFILE_FETCH_CONCURRENCY = 6;
 const MAX_GALLERY_IMAGES = 30;
+
+// Every performer's profile lives at this same path regardless of category —
+// /pornstars/{slug}/ — so a name lookup can go straight there without first
+// crawling a listing page.
+const PROFILE_BASE_URL = 'https://www.pornpics.com/pornstars/';
+
+// Converts a display name into this site's URL slug convention, e.g.
+// "Angela White" -> "angela-white".
+export function slugifyName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/['’]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
 
 // Some gallery CDNs (e.g. pornpics.com's cdni.pornpics.com) serve a small
 // thumbnail by default at a "/460/" size segment in the path, with a much
@@ -237,6 +258,42 @@ export function extractProfileGallery(
   return { avatarUrl, images };
 }
 
+// Fetches one character's own profile page and extracts their avatar +
+// gallery. Never throws — a missing/unreachable profile just comes back with
+// no images, which the review UI already surfaces as "needs images added".
+async function fetchProfile(
+  name: string,
+  profileUrl: string,
+  categoryKey: 'trans' | 'sluts' | 'twinks'
+): Promise<ExtractedItem> {
+  try {
+    const profileRes = await fetch(profileUrl, { headers: FETCH_HEADERS });
+    if (!profileRes.ok) {
+      return { name, avatarUrl: '', categoryKey, availableImages: [] };
+    }
+    const profileHtml = await profileRes.text();
+    const { avatarUrl, images } = extractProfileGallery(profileHtml, profileUrl);
+    return { name, avatarUrl, categoryKey, availableImages: images };
+  } catch {
+    return { name, avatarUrl: '', categoryKey, availableImages: [] };
+  }
+}
+
+async function fetchProfilesInBatches(
+  links: ProfileLink[],
+  categoryKey: 'trans' | 'sluts' | 'twinks'
+): Promise<ExtractedItem[]> {
+  const items: ExtractedItem[] = [];
+  for (let i = 0; i < links.length; i += PROFILE_FETCH_CONCURRENCY) {
+    const chunk = links.slice(i, i + PROFILE_FETCH_CONCURRENCY);
+    const chunkResults = await Promise.all(
+      chunk.map((link) => fetchProfile(link.name, link.profileUrl, categoryKey))
+    );
+    items.push(...chunkResults);
+  }
+  return items;
+}
+
 // POST /api/crawler/fetch
 crawlerRouter.post('/fetch', zValidator('json', crawlerFetchSchema), async (c) => {
   const { url, categoryKey } = c.req.valid('json');
@@ -257,30 +314,28 @@ crawlerRouter.post('/fetch', zValidator('json', crawlerFetchSchema), async (c) =
   }
 
   const profileLinks = extractProfileLinks(listingHtml, url).slice(0, MAX_PROFILES_PER_CRAWL);
-
-  const items: ExtractedItem[] = [];
-  for (let i = 0; i < profileLinks.length; i += PROFILE_FETCH_CONCURRENCY) {
-    const chunk = profileLinks.slice(i, i + PROFILE_FETCH_CONCURRENCY);
-    const chunkResults = await Promise.all(
-      chunk.map(async (link): Promise<ExtractedItem> => {
-        try {
-          const profileRes = await fetch(link.profileUrl, { headers: FETCH_HEADERS });
-          if (!profileRes.ok) {
-            return { name: link.name, avatarUrl: '', categoryKey, availableImages: [] };
-          }
-          const profileHtml = await profileRes.text();
-          const { avatarUrl, images } = extractProfileGallery(profileHtml, link.profileUrl);
-          return { name: link.name, avatarUrl, categoryKey, availableImages: images };
-        } catch {
-          return { name: link.name, avatarUrl: '', categoryKey, availableImages: [] };
-        }
-      })
-    );
-    items.push(...chunkResults);
-  }
+  const items = await fetchProfilesInBatches(profileLinks, categoryKey);
 
   return c.json({
     url,
+    categoryKey,
+    totalFound: items.length,
+    items,
+  });
+});
+
+// POST /api/crawler/fetch-by-name
+crawlerRouter.post('/fetch-by-name', zValidator('json', crawlerFetchByNameSchema), async (c) => {
+  const { names, categoryKey } = c.req.valid('json');
+
+  const links: ProfileLink[] = names.map((name) => ({
+    name,
+    profileUrl: `${PROFILE_BASE_URL}${slugifyName(name)}/`,
+  }));
+
+  const items = await fetchProfilesInBatches(links, categoryKey);
+
+  return c.json({
     categoryKey,
     totalFound: items.length,
     items,
