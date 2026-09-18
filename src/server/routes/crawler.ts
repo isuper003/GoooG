@@ -17,6 +17,14 @@ export interface ExtractedItem {
   availableImages: string[]; // Gallery images, excluding profile avatar
 }
 
+// Some gallery CDNs (e.g. pornpics.com's cdni.pornpics.com) serve a small
+// thumbnail by default at a "/460/" size segment in the path, with a much
+// larger "/1280/" version available at the same path otherwise. Swap it in
+// so crawled characters get full-resolution images instead of thumbnails.
+export function upgradeImageResolution(url: string): string {
+  return url.replace(/\/460\//, '/1280/');
+}
+
 // Helper to make relative URL absolute
 function toAbsoluteUrl(urlStr: string, baseUrl: string): string | null {
   try {
@@ -24,7 +32,7 @@ function toAbsoluteUrl(urlStr: string, baseUrl: string): string | null {
     if (!trimmed || trimmed.startsWith('data:') || trimmed.startsWith('javascript:')) {
       return null;
     }
-    return new URL(trimmed, baseUrl).href;
+    return upgradeImageResolution(new URL(trimmed, baseUrl).href);
   } catch {
     return null;
   }
@@ -42,7 +50,7 @@ function cleanName(raw: string): string {
 }
 
 // Parse HTML string into character items with profile avatar and gallery candidate images
-function parseHtmlContent(
+export function parseHtmlContent(
   html: string,
   baseUrl: string,
   categoryKey: 'trans' | 'sluts' | 'twinks'
@@ -59,11 +67,7 @@ function parseHtmlContent(
     if (!innerHtml) continue;
 
     // Check if innerHtml has an <img> tag
-    const imgMatches = [
-      ...innerHtml.matchAll(
-        /<img\s+[^>]*(?:src|data-src|data-original|data-lazy|data-thumb)=["']([^"']+)["'][^>]*>/gi
-      ),
-    ];
+    const imgMatches = [...innerHtml.matchAll(/<img\s+[^>]+>/gi)];
 
     if (imgMatches.length === 0) continue;
 
@@ -101,10 +105,30 @@ function parseHtmlContent(
     const urls: string[] = [];
     for (const imgMatch of imgMatches) {
       const fullTag = imgMatch[0];
-      const srcAttr =
-        fullTag.match(/(?:data-original|data-src|data-lazy|data-thumb|src)=["']([^"']+)["']/i);
-      if (srcAttr && srcAttr[1]) {
-        const absUrl = toAbsoluteUrl(srcAttr[1], baseUrl);
+      
+      const getAttr = (attr: string) => {
+        const m = fullTag.match(new RegExp(`${attr}=["']([^"']+)["']`, 'i'));
+        return m ? m[1] : null;
+      };
+
+      const possibleUrls = [
+        getAttr('data-original'),
+        getAttr('data-src'),
+        getAttr('data-lazy'),
+        getAttr('data-thumb'),
+        getAttr('src'),
+      ];
+
+      let bestUrl = '';
+      for (const p of possibleUrls) {
+        if (p && !p.includes('1px') && !p.includes('blank')) {
+          bestUrl = p;
+          break;
+        }
+      }
+
+      if (bestUrl) {
+        const absUrl = toAbsoluteUrl(bestUrl, baseUrl);
         if (absUrl && (absUrl.startsWith('http://') || absUrl.startsWith('https://'))) {
           urls.push(absUrl);
         }
@@ -131,27 +155,60 @@ function parseHtmlContent(
 
   // Pattern 2: Fallback if Pattern 1 found fewer than 2 items - scan all <img> tags with alt text
   if (itemsMap.size < 2) {
-    const standaloneImgRegex =
-      /<img\s+[^>]*(?:alt|title)=["']([^"']+)["'][^>]*(?:data-original|data-src|data-lazy|data-thumb|src)=["']([^"']+)["'][^>]*>/gi;
+    const standaloneImgRegex = /<img\s+[^>]+>/gi;
     let imgMatch: RegExpExecArray | null;
 
     while ((imgMatch = standaloneImgRegex.exec(html)) !== null) {
-      const rawName = cleanName(imgMatch[1] || '');
-      const rawUrl = imgMatch[2];
-      if (!rawName || rawName.length < 2 || !rawUrl) continue;
+      const fullTag = imgMatch[0];
+      
+      const getAttr = (attr: string) => {
+        const m = fullTag.match(new RegExp(`${attr}=["']([^"']+)["']`, 'i'));
+        return m ? m[1] : null;
+      };
 
-      const absUrl = toAbsoluteUrl(rawUrl, baseUrl);
-      if (absUrl) {
-        const current = itemsMap.get(rawName) || {
-          avatarUrl: absUrl,
-          galleryImages: new Set<string>(),
-        };
-        if (!current.avatarUrl) {
-          current.avatarUrl = absUrl;
-        } else if (absUrl !== current.avatarUrl) {
-          current.galleryImages.add(absUrl);
+      const altMatch = fullTag.match(/alt=["']([^"']+)["']/i) || fullTag.match(/title=["']([^"']+)["']/i);
+      const rawName = cleanName(altMatch ? (altMatch[1] || '') : '');
+      
+      if (!rawName || rawName.length < 2) continue;
+
+      const possibleUrls = [
+        getAttr('data-original'),
+        getAttr('data-src'),
+        getAttr('data-lazy'),
+        getAttr('data-thumb'),
+        getAttr('src'),
+      ];
+
+      let bestUrl = '';
+      for (const p of possibleUrls) {
+        if (p && !p.includes('1px') && !p.includes('blank')) {
+          bestUrl = p;
+          break;
         }
-        itemsMap.set(rawName, current);
+      }
+
+      if (bestUrl) {
+        const absUrl = toAbsoluteUrl(bestUrl, baseUrl);
+        if (absUrl && (absUrl.startsWith('http://') || absUrl.startsWith('https://'))) {
+          // Skip images Pattern 1 already captured under a card's single name —
+          // otherwise a second <img alt="X 2"> in the same card spawns a bogus
+          // extra "character" for what is really just another photo of X.
+          const alreadyCaptured = Array.from(itemsMap.values()).some(
+            (entry) => entry.avatarUrl === absUrl || entry.galleryImages.has(absUrl)
+          );
+          if (alreadyCaptured) continue;
+
+          const current = itemsMap.get(rawName) || {
+            avatarUrl: absUrl,
+            galleryImages: new Set<string>(),
+          };
+          if (!current.avatarUrl) {
+            current.avatarUrl = absUrl;
+          } else if (absUrl !== current.avatarUrl) {
+            current.galleryImages.add(absUrl);
+          }
+          itemsMap.set(rawName, current);
+        }
       }
     }
   }

@@ -25,6 +25,7 @@ export interface CharacterDTO {
   correctCount: number;
   wrongCount: number;
   srsLevel: number;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }

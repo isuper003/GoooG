@@ -20,6 +20,10 @@ export const characterUpdateSchema = z.object({
   images: z.array(characterImageInputSchema).min(1, 'At least 1 image is required').max(6, 'At most 6 images allowed'),
 });
 
+export const characterActiveSchema = z.object({
+  isActive: z.boolean(),
+});
+
 export const labelCreateSchema = z.object({
   name: z.string().trim().min(1, 'Label name is required'),
 });
@@ -48,6 +52,7 @@ export const gameSessionFinishSchema = z.object({
 
 export type CharacterCreateInput = z.infer<typeof characterCreateSchema>;
 export type CharacterUpdateInput = z.infer<typeof characterUpdateSchema>;
+export type CharacterActiveInput = z.infer<typeof characterActiveSchema>;
 export type LabelCreateInput = z.infer<typeof labelCreateSchema>;
 export type GameSessionCreateInput = z.infer<typeof gameSessionCreateSchema>;
 export type GameAnswerInput = z.infer<typeof gameAnswerSchema>;

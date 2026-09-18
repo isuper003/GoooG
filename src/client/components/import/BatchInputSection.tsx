@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { QueueItem } from './RowByRowReviewer';
+import { parseBatchInput } from '../../lib/parseBatchInput';
 
 interface BatchInputSectionProps {
   onLoadQueue: (items: QueueItem[]) => void;
@@ -11,139 +12,12 @@ export default function BatchInputSection({ onLoadQueue }: BatchInputSectionProp
   const [error, setError] = useState<string | null>(null);
 
   function parseInput() {
-    const raw = inputText.trim();
-    if (!raw) {
+    if (!inputText.trim()) {
       setError('Please paste text, links, or JSON to load characters.');
       return;
     }
 
-    const items: QueueItem[] = [];
-
-    // Try parsing as JSON first
-    if (raw.startsWith('[') || raw.startsWith('{')) {
-      try {
-        const parsed = JSON.parse(raw);
-        const array = Array.isArray(parsed) ? parsed : [parsed];
-
-        array.forEach((obj, idx) => {
-          if (!obj || typeof obj !== 'object') return;
-          const name = String(obj.name || obj.title || `Character ${idx + 1}`).trim();
-          let categoryKey: 'trans' | 'sluts' | 'twinks' = defaultCategory;
-          const rawCat = String(obj.category || obj.categoryKey || '').toLowerCase();
-          if (rawCat === 'trans') categoryKey = 'trans';
-          else if (rawCat === 'sluts' || rawCat === 'sl') categoryKey = 'sluts';
-          else if (rawCat === 'twinks') categoryKey = 'twinks';
-
-          const imagesList: string[] = [];
-          if (Array.isArray(obj.images)) {
-            obj.images.forEach((img: unknown) => {
-              if (typeof img === 'string' && img.trim()) imagesList.push(img.trim());
-              else if (img && typeof img === 'object' && 'url' in img) imagesList.push(String((img as { url: string }).url).trim());
-            });
-          } else if (typeof obj.image === 'string' && obj.image.trim()) {
-            imagesList.push(obj.image.trim());
-          } else if (typeof obj.url === 'string' && obj.url.trim()) {
-            imagesList.push(obj.url.trim());
-          }
-
-          let avatarUrl = '';
-          if (typeof obj.avatar === 'string' && obj.avatar.trim()) {
-            avatarUrl = obj.avatar.trim();
-          } else if (typeof obj.avatarUrl === 'string' && obj.avatarUrl.trim()) {
-            avatarUrl = obj.avatarUrl.trim();
-          } else if (imagesList.length > 0) {
-            avatarUrl = imagesList[0];
-          }
-
-          // Exclude avatarUrl from candidate gallery images if multiple images exist
-          const candidateImages = imagesList.filter((u) => u !== avatarUrl);
-
-          items.push({
-            id: `item-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
-            name,
-            avatarUrl,
-            categoryKey,
-            labelIds: [],
-            availableImages: candidateImages.length > 0 ? candidateImages : (avatarUrl ? [avatarUrl] : []),
-            selectedImages: candidateImages.slice(0, 6),
-            status: 'pending',
-          });
-        });
-
-        if (items.length > 0) {
-          setError(null);
-          onLoadQueue(items);
-          return;
-        }
-      } catch {
-        // Not valid JSON, proceed to line-by-line parser
-      }
-    }
-
-    // Line-by-line parser
-    const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-
-    lines.forEach((line, idx) => {
-      // Check if pipe-delimited: Name | Category | url1, url2 OR Name | url1, url2
-      if (line.includes('|')) {
-        const parts = line.split('|').map((p) => p.trim());
-        let name = `Character ${idx + 1}`;
-        let categoryKey: 'trans' | 'sluts' | 'twinks' = defaultCategory;
-        let urlsPart = '';
-
-        if (parts.length >= 3) {
-          name = parts[0] || name;
-          const rawCat = parts[1].toLowerCase();
-          if (rawCat === 'trans') categoryKey = 'trans';
-          else if (rawCat === 'sluts' || rawCat === 'sl') categoryKey = 'sluts';
-          else if (rawCat === 'twinks') categoryKey = 'twinks';
-          urlsPart = parts.slice(2).join('|');
-        } else {
-          name = parts[0] || name;
-          urlsPart = parts[1] || '';
-        }
-
-        const urls = urlsPart
-          .split(/[\s,]+/)
-          .map((u) => u.trim())
-          .filter((u) => u.startsWith('http://') || u.startsWith('https://'));
-
-        const avatarUrl = urls[0] || '';
-        const galleryCandidateImages = urls.filter((u) => u !== avatarUrl);
-
-        items.push({
-          id: `item-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
-          name,
-          avatarUrl,
-          categoryKey,
-          labelIds: [],
-          availableImages: galleryCandidateImages.length > 0 ? galleryCandidateImages : (avatarUrl ? [avatarUrl] : []),
-          selectedImages: galleryCandidateImages.slice(0, 6),
-          status: 'pending',
-        });
-      } else if (line.startsWith('http://') || line.startsWith('https://')) {
-        // Pure image link: infer name from filename or URL
-        try {
-          const u = new URL(line);
-          const pathname = u.pathname;
-          const fileName = pathname.substring(pathname.lastIndexOf('/') + 1).replace(/\.[^/.]+$/, '');
-          const cleanName = fileName.replace(/[-_]+/g, ' ').trim() || `Character ${idx + 1}`;
-
-          items.push({
-            id: `item-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
-            name: cleanName,
-            avatarUrl: line,
-            categoryKey: defaultCategory,
-            labelIds: [],
-            availableImages: [line],
-            selectedImages: [line],
-            status: 'pending',
-          });
-        } catch {
-          // Invalid URL
-        }
-      }
-    });
+    const items = parseBatchInput(inputText, defaultCategory);
 
     if (items.length === 0) {
       setError('Could not extract characters from input. Check format or examples below.');

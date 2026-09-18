@@ -33,6 +33,15 @@ export function useUpdateCharacter() {
   });
 }
 
+export function useSetCharacterActive() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
+      apiClient.setCharacterActive(id, { isActive }),
+    onSuccess: () => invalidateCharacterQueries(qc),
+  });
+}
+
 export function useDeleteCharacter() {
   const qc = useQueryClient();
   return useMutation({

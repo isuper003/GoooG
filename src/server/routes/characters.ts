@@ -1,7 +1,11 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { queryAll, queryOne } from '../db';
-import { characterCreateSchema, characterUpdateSchema } from '../../shared/validation';
+import {
+  characterCreateSchema,
+  characterUpdateSchema,
+  characterActiveSchema,
+} from '../../shared/validation';
 import type { CharacterDTO, CharacterImageDTO, LabelDTO } from '../../shared/types';
 import type { AppEnv } from '../app';
 
@@ -12,6 +16,7 @@ interface CharacterRow {
   correct_count: number;
   wrong_count: number;
   srs_level: number;
+  is_active: number;
   created_at: string;
   updated_at: string;
 }
@@ -54,7 +59,7 @@ async function resolveLabels(
 export async function getCharacterById(db: D1Database, id: number): Promise<CharacterDTO | null> {
   const row = await queryOne<CharacterRow>(
     db,
-    `SELECT c.id, c.name, cat.key AS category_key, c.correct_count, c.wrong_count, c.srs_level, c.created_at, c.updated_at
+    `SELECT c.id, c.name, cat.key AS category_key, c.correct_count, c.wrong_count, c.srs_level, c.is_active, c.created_at, c.updated_at
      FROM characters c
      JOIN categories cat ON c.category_id = cat.id
      WHERE c.id = ?`,
@@ -87,6 +92,7 @@ export async function getCharacterById(db: D1Database, id: number): Promise<Char
     correctCount: row.correct_count,
     wrongCount: row.wrong_count,
     srsLevel: row.srs_level,
+    isActive: !!row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -147,7 +153,7 @@ charactersRouter.get('/', async (c) => {
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   const query = `
-    SELECT c.id, c.name, cat.key AS category_key, c.correct_count, c.wrong_count, c.srs_level, c.created_at, c.updated_at
+    SELECT c.id, c.name, cat.key AS category_key, c.correct_count, c.wrong_count, c.srs_level, c.is_active, c.created_at, c.updated_at
     FROM characters c
     JOIN categories cat ON c.category_id = cat.id
     ${whereClause}
@@ -198,6 +204,7 @@ charactersRouter.get('/', async (c) => {
     correctCount: row.correct_count,
     wrongCount: row.wrong_count,
     srsLevel: row.srs_level,
+    isActive: !!row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));
@@ -320,6 +327,33 @@ charactersRouter.put('/:id', zValidator('json', characterUpdateSchema), async (c
   });
 
   await c.env.DB.batch(batchStatements);
+
+  const updated = await getCharacterById(c.env.DB, id);
+  return c.json(updated, 200);
+});
+
+// PATCH /api/characters/:id/active
+charactersRouter.patch('/:id/active', zValidator('json', characterActiveSchema), async (c) => {
+  const id = Number(c.req.param('id'));
+  if (isNaN(id)) {
+    return c.json({ error: 'not_found' }, 404);
+  }
+
+  const existing = await queryOne<{ id: number }>(
+    c.env.DB,
+    'SELECT id FROM characters WHERE id = ?',
+    id
+  );
+  if (!existing) {
+    return c.json({ error: 'not_found' }, 404);
+  }
+
+  const { isActive } = c.req.valid('json');
+  const now = new Date().toISOString();
+
+  await c.env.DB.prepare('UPDATE characters SET is_active = ?, updated_at = ? WHERE id = ?')
+    .bind(isActive ? 1 : 0, now, id)
+    .run();
 
   const updated = await getCharacterById(c.env.DB, id);
   return c.json(updated, 200);

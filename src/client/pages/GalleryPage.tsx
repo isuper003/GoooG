@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import type { CharacterDTO } from '../../shared/types';
 import type { CharacterSort } from '../lib/apiClient';
-import { useCharacters, useDeleteCharacter } from '../hooks/useCharacters';
+import { useCharacters, useDeleteCharacter, useSetCharacterActive } from '../hooks/useCharacters';
 import { useLabels } from '../hooks/useLabels';
 import CharacterCard from '../components/gallery/CharacterCard';
 import CharacterEditModal from '../components/gallery/CharacterEditModal';
@@ -38,6 +38,7 @@ export default function GalleryPage() {
   });
   const { data: labels = [] } = useLabels();
   const deleteCharacter = useDeleteCharacter();
+  const setCharacterActive = useSetCharacterActive();
 
   return (
     <div className="space-y-6">
@@ -123,6 +124,12 @@ export default function GalleryPage() {
               onEdit={() => setEditingCharacter(character)}
               onViewImages={() => setViewingImagesFor(character)}
               onDelete={() => setDeletingCharacter(character)}
+              onToggleActive={() =>
+                setCharacterActive.mutate({ id: character.id, isActive: !character.isActive })
+              }
+              isTogglingActive={
+                setCharacterActive.isPending && setCharacterActive.variables?.id === character.id
+              }
             />
           ))}
         </motion.div>

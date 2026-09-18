@@ -51,12 +51,14 @@ sessionsRouter.post('/', zValidator('json', gameSessionCreateSchema), async (c) 
   const query = isMix
     ? `SELECT c.id, c.name, c.srs_level, c.correct_count, c.wrong_count
        FROM characters c
-       WHERE EXISTS (SELECT 1 FROM character_images ci WHERE ci.character_id = c.id)
+       WHERE c.is_active = 1
+         AND EXISTS (SELECT 1 FROM character_images ci WHERE ci.character_id = c.id)
        ORDER BY c.id ASC`
     : `SELECT c.id, c.name, c.srs_level, c.correct_count, c.wrong_count
        FROM characters c
        JOIN categories cat ON c.category_id = cat.id
        WHERE cat.key = ?
+         AND c.is_active = 1
          AND EXISTS (SELECT 1 FROM character_images ci WHERE ci.character_id = c.id)
        ORDER BY c.id ASC`;
 

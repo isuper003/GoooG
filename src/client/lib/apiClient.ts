@@ -13,6 +13,7 @@ import type {
   GameSessionFinishInput,
   CharacterCreateInput,
   CharacterUpdateInput,
+  CharacterActiveInput,
   LabelCreateInput,
 } from '../../shared/validation';
 
@@ -94,6 +95,12 @@ export const apiClient = {
   updateCharacter: (id: number, body: CharacterUpdateInput) =>
     request<CharacterDTO>(`/api/characters/${id}`, {
       method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  setCharacterActive: (id: number, body: CharacterActiveInput) =>
+    request<CharacterDTO>(`/api/characters/${id}/active`, {
+      method: 'PATCH',
       body: JSON.stringify(body),
     }),
 

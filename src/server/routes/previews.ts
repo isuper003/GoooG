@@ -14,7 +14,7 @@ previewsRouter.get('/', async (c) => {
        FROM character_images ci
        JOIN characters c ON ci.character_id = c.id
        JOIN categories cat ON c.category_id = cat.id
-       WHERE ci.position = 0 AND cat.key = ?
+       WHERE ci.position = 0 AND cat.key = ? AND c.is_active = 1
        ORDER BY RANDOM()
        LIMIT 8`,
       categoryKey
@@ -28,7 +28,7 @@ previewsRouter.get('/', async (c) => {
       `SELECT ci.url
        FROM character_images ci
        JOIN characters c ON ci.character_id = c.id
-       WHERE ci.position = 0
+       WHERE ci.position = 0 AND c.is_active = 1
        ORDER BY RANDOM()
        LIMIT 8`
     );

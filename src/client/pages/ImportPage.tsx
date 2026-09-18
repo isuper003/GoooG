@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useCharacters, useCreateCharacter } from '../hooks/useCharacters';
 import LabelMultiSelect from '../components/shared/LabelMultiSelect';
 import ImageUrlListEditor from '../components/shared/ImageUrlListEditor';
-import CategoryCrawlerSection from '../components/import/CategoryCrawlerSection';
+import CrawlerSection from '../components/import/CrawlerSection';
 import BatchInputSection from '../components/import/BatchInputSection';
 import RowByRowReviewer, { type QueueItem } from '../components/import/RowByRowReviewer';
 
@@ -147,7 +147,8 @@ export default function ImportPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-fg">Character Importer &amp; Crawler</h1>
           <p className="text-fg-muted mt-1">
-            Crawl target category URLs, review characters row-by-row, and pick candidate images from the bottom tray.
+            Crawl target category URLs and bulk-save the results, paste text/JSON for a row-by-row review with a
+            candidate image tray, or add a single character manually.
           </p>
         </div>
 
@@ -191,29 +192,7 @@ export default function ImportPage() {
 
       {/* MODE 1: Web Crawler */}
       {importMode === 'crawler' ? (
-        <div className="flex flex-col gap-6">
-          <CategoryCrawlerSection onLoadQueue={handleLoadQueue} />
-
-          {queue.length > 0 ? (
-            <RowByRowReviewer
-              queue={queue}
-              allCharacters={allCharacters}
-              onUpdateItem={handleUpdateQueueItem}
-              onSaveItem={handleSaveQueueItem}
-              onSaveAllReady={handleSaveAllReady}
-              onClearQueue={handleClearQueue}
-              isSavingBatch={isSavingBatch}
-            />
-          ) : (
-            <div className="rounded-card border border-dashed border-bg-hover bg-bg-card/40 p-8 text-center text-fg-dim flex flex-col items-center justify-center gap-2">
-              <span className="text-3xl">📥</span>
-              <p className="text-sm font-medium text-fg-muted">Queue is currently empty</p>
-              <p className="text-xs max-w-md">
-                Select one of the 3 category buttons above (Trans / Sluts / Twinks), verify the URL variable and page number, then click <strong>&quot;🚀 Crawl Page&quot;</strong> to start reviewing characters row-by-row.
-              </p>
-            </div>
-          )}
-        </div>
+        <CrawlerSection />
       ) : null}
 
       {/* MODE 2: Batch Text / JSON Input */}
