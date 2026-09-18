@@ -25,7 +25,7 @@ export type CharacterSort =
   | 'weakest';
 
 export interface CharacterListParams {
-  category?: 'male' | 'female' | 'boys' | 'mix';
+  category?: 'trans' | 'sluts' | 'twinks' | 'mix';
   label?: number;
   search?: string;
   sort?: CharacterSort;
@@ -128,5 +128,21 @@ export const apiClient = {
     request<{ ok: boolean }>(`/api/game-sessions/${sessionId}/finish`, {
       method: 'POST',
       body: JSON.stringify(body),
+    }),
+
+  crawlUrl: (url: string, categoryKey: 'trans' | 'sluts' | 'twinks' = 'sluts') =>
+    request<{
+      url: string;
+      categoryKey: 'trans' | 'sluts' | 'twinks';
+      totalFound: number;
+      items: Array<{
+        name: string;
+        avatarUrl?: string;
+        categoryKey: 'trans' | 'sluts' | 'twinks';
+        availableImages: string[];
+      }>;
+    }>('/api/crawler/fetch', {
+      method: 'POST',
+      body: JSON.stringify({ url, categoryKey }),
     }),
 };

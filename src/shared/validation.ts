@@ -25,7 +25,7 @@ export const labelCreateSchema = z.object({
 });
 
 export const gameSessionCreateSchema = z.object({
-  scope: z.enum(['male', 'female', 'boys', 'mix']),
+  scope: z.enum(['trans', 'sluts', 'twinks', 'mix']),
   mode: z.enum(['classic', 'match']),
   plannedRounds: z.number().int().positive().nullable().optional(),
 });

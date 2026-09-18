@@ -9,16 +9,16 @@ interface CharacterEditModalProps {
   onClose: () => void;
 }
 
-const CATEGORY_OPTIONS: { value: 'male' | 'female' | 'boys'; label: string }[] = [
-  { value: 'male', label: 'Male' },
-  { value: 'female', label: 'Female' },
-  { value: 'boys', label: 'Boys' },
+const CATEGORY_OPTIONS: { value: 'trans' | 'sluts' | 'twinks'; label: string }[] = [
+  { value: 'trans', label: 'Trans' },
+  { value: 'sluts', label: 'Sluts' },
+  { value: 'twinks', label: 'Twinks' },
 ];
 
 export default function CharacterEditModal({ character, onClose }: CharacterEditModalProps) {
   const [name, setName] = useState(character.name);
-  const [categoryKey, setCategoryKey] = useState<'male' | 'female' | 'boys'>(
-    character.categoryKey as 'male' | 'female' | 'boys'
+  const [categoryKey, setCategoryKey] = useState<'trans' | 'sluts' | 'twinks'>(
+    character.categoryKey as 'trans' | 'sluts' | 'twinks'
   );
   const [labelIds, setLabelIds] = useState<number[]>(character.labels.map((l) => l.id));
   const [images, setImages] = useState<string[]>(character.images.map((img) => img.url));
@@ -90,7 +90,7 @@ export default function CharacterEditModal({ character, onClose }: CharacterEdit
           </label>
           <select
             value={categoryKey}
-            onChange={(e) => setCategoryKey(e.target.value as 'male' | 'female' | 'boys')}
+            onChange={(e) => setCategoryKey(e.target.value as 'trans' | 'sluts' | 'twinks')}
             className="rounded-button border border-bg-hover bg-bg-muted px-3 py-2 text-sm text-fg"
           >
             {CATEGORY_OPTIONS.map((opt) => (
@@ -129,7 +129,7 @@ export default function CharacterEditModal({ character, onClose }: CharacterEdit
             type="button"
             onClick={handleSave}
             disabled={updateCharacter.isPending}
-            className="flex-1 rounded-button bg-category-male px-4 py-2.5 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="flex-1 rounded-button bg-category-trans px-4 py-2.5 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {updateCharacter.isPending ? 'Saving...' : 'Save changes'}
           </button>

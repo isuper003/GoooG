@@ -11,7 +11,7 @@ import ImageLightbox from '../components/gallery/ImageLightbox';
 import LabelManager from '../components/gallery/LabelManager';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 
-type CategoryFilter = 'male' | 'female' | 'boys' | undefined;
+type CategoryFilter = 'trans' | 'sluts' | 'twinks' | undefined;
 
 export default function GalleryPage() {
   const [search, setSearch] = useState('');
@@ -59,9 +59,9 @@ export default function GalleryPage() {
           className="rounded-button border border-bg-hover bg-bg-card px-3 py-2 text-sm text-fg"
         >
           <option value="">All categories</option>
-          <option value="male">Male</option>
-          <option value="female">Female</option>
-          <option value="boys">Boys</option>
+          <option value="trans">Trans</option>
+          <option value="sluts">Sluts</option>
+          <option value="twinks">Twinks</option>
         </select>
         <select
           value={labelFilter ?? ''}
@@ -107,7 +107,7 @@ export default function GalleryPage() {
               <p className="text-fg-muted">No characters yet &mdash; add some in Smart Import.</p>
               <Link
                 to="/import"
-                className="rounded-button bg-category-male px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                className="rounded-button bg-category-trans px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
               >
                 Go to Smart Import
               </Link>

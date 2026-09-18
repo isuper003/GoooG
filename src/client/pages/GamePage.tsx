@@ -40,7 +40,7 @@ export default function GamePage() {
         </p>
         <Link
           to="/"
-          className="rounded-button bg-category-male px-5 py-2.5 font-semibold text-white transition-opacity hover:opacity-90"
+          className="rounded-button bg-category-trans px-5 py-2.5 font-semibold text-white transition-opacity hover:opacity-90"
         >
           Back to Home
         </Link>

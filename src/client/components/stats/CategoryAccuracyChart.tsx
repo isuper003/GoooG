@@ -1,15 +1,17 @@
 import type { CategoryStats } from '../../../shared/types';
 
 const CATEGORY_LABELS: Record<string, string> = {
-  male: 'Male',
-  female: 'Female',
-  boys: 'Boys',
+  trans: 'Trans',
+  sluts: 'Sluts',
+  sl: 'Sluts',
+  twinks: 'Twinks',
 };
 
 const CATEGORY_BAR_CLASSES: Record<string, string> = {
-  male: 'bg-category-male',
-  female: 'bg-category-female',
-  boys: 'bg-category-boys',
+  trans: 'bg-category-trans',
+  sluts: 'bg-category-sluts',
+  sl: 'bg-category-sluts',
+  twinks: 'bg-category-twinks',
 };
 
 interface CategoryAccuracyChartProps {

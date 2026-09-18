@@ -35,17 +35,17 @@ previewsRouter.get('/', async (c) => {
     return rows.map((r) => r.url);
   };
 
-  const [male, female, boys, mix] = await Promise.all([
-    getCategoryUrls('male'),
-    getCategoryUrls('female'),
-    getCategoryUrls('boys'),
+  const [trans, sluts, twinks, mix] = await Promise.all([
+    getCategoryUrls('trans'),
+    getCategoryUrls('sluts'),
+    getCategoryUrls('twinks'),
     getMixUrls(),
   ]);
 
   const response: HomePreviewsDTO = {
-    male,
-    female,
-    boys,
+    trans,
+    sluts,
+    twinks,
     mix,
   };
 

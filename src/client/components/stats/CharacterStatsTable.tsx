@@ -2,9 +2,10 @@ import type { CharacterDTO } from '../../../shared/types';
 import type { CharacterSort } from '../../lib/apiClient';
 
 const CATEGORY_CLASSES: Record<string, string> = {
-  male: 'bg-category-male/20 text-category-male',
-  female: 'bg-category-female/20 text-category-female',
-  boys: 'bg-category-boys/20 text-category-boys',
+  trans: 'bg-category-trans/20 text-category-trans',
+  sluts: 'bg-category-sluts/20 text-category-sluts',
+  sl: 'bg-category-sl/20 text-category-sl',
+  twinks: 'bg-category-twinks/20 text-category-twinks',
 };
 
 interface CharacterStatsTableProps {

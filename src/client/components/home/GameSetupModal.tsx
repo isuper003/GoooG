@@ -5,7 +5,7 @@ import { apiClient, ApiError } from '../../lib/apiClient';
 import type { GameMode } from '../../hooks/useGameSession';
 
 interface GameSetupModalProps {
-  scope: 'male' | 'female' | 'boys' | 'mix';
+  scope: 'trans' | 'sluts' | 'twinks' | 'mix';
   scopeLabel: string;
   onClose: () => void;
 }
@@ -87,7 +87,7 @@ export default function GameSetupModal({ scope, scopeLabel, onClose }: GameSetup
                   onClick={() => setPlannedRounds(opt.value)}
                   className={`rounded-button px-4 py-2 text-sm font-semibold transition-colors ${
                     plannedRounds === opt.value
-                      ? 'bg-category-male text-white'
+                      ? 'bg-category-trans text-white'
                       : 'bg-bg-muted text-fg-muted hover:bg-bg-hover hover:text-fg'
                   }`}
                 >
@@ -107,7 +107,7 @@ export default function GameSetupModal({ scope, scopeLabel, onClose }: GameSetup
                 onClick={() => setMode('classic')}
                 className={`rounded-button border px-4 py-3 text-left transition-colors ${
                   mode === 'classic'
-                    ? 'border-category-male bg-category-male/10'
+                    ? 'border-category-trans bg-category-trans/10'
                     : 'border-bg-hover bg-bg-muted hover:bg-bg-hover'
                 }`}
               >
@@ -119,7 +119,7 @@ export default function GameSetupModal({ scope, scopeLabel, onClose }: GameSetup
                 onClick={() => setMode('match')}
                 className={`rounded-button border px-4 py-3 text-left transition-colors ${
                   mode === 'match'
-                    ? 'border-category-male bg-category-male/10'
+                    ? 'border-category-trans bg-category-trans/10'
                     : 'border-bg-hover bg-bg-muted hover:bg-bg-hover'
                 }`}
               >
@@ -147,7 +147,7 @@ export default function GameSetupModal({ scope, scopeLabel, onClose }: GameSetup
               type="button"
               onClick={handleStart}
               disabled={isStarting}
-              className="flex-1 rounded-button bg-category-male px-4 py-2.5 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="flex-1 rounded-button bg-category-trans px-4 py-2.5 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {isStarting ? 'Starting...' : 'Start'}
             </button>

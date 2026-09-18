@@ -65,13 +65,15 @@ export default function ImageUrlListEditor({ value, onChange }: ImageUrlListEdit
               src={url}
               alt=""
               referrerPolicy="no-referrer"
+              loading="lazy"
+              decoding="async"
               className="h-full w-full object-cover"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.opacity = '0.2';
               }}
             />
             {i === 0 ? (
-              <span className="absolute top-1 left-1 rounded-badge bg-category-male px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
+              <span className="absolute top-1 left-1 rounded-badge bg-category-trans px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
                 Primary
               </span>
             ) : null}

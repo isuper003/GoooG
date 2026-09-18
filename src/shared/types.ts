@@ -64,8 +64,8 @@ export interface GameAnswerResponse {
 }
 
 export interface HomePreviewsDTO {
-  male: string[];
-  female: string[];
-  boys: string[];
+  trans: string[];
+  sluts: string[];
+  twinks: string[];
   mix: string[];
 }

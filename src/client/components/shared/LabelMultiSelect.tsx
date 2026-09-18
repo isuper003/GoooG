@@ -56,7 +56,7 @@ export default function LabelMultiSelect({ selectedIds, onChange }: LabelMultiSe
                 onClick={() => toggle(label.id)}
                 className={`rounded-badge px-3 py-1 text-xs font-medium transition-colors ${
                   selected
-                    ? 'bg-category-male text-white'
+                    ? 'bg-category-trans text-white'
                     : 'bg-bg-muted text-fg-muted hover:bg-bg-hover hover:text-fg'
                 }`}
               >

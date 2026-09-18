@@ -14,7 +14,7 @@ export default function App() {
       <header className="sticky top-0 z-50 border-b border-bg-muted bg-bg-nav/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 flex items-center gap-2 sm:gap-4">
           <div className="flex items-center gap-3 shrink-0">
-            <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-category-male via-category-female to-category-boys bg-clip-text text-transparent">
+            <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-category-trans via-category-sluts to-category-twinks bg-clip-text text-transparent">
               GoooG
             </span>
             <span className="hidden md:inline-block text-xs font-semibold uppercase tracking-wider text-fg-muted px-2 py-0.5 rounded-badge bg-bg-muted border border-bg-hover">

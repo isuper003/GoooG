@@ -1,2 +1,2 @@
 INSERT OR IGNORE INTO categories (key, label, sort_order)
-VALUES ('male', 'Male', 1), ('female', 'Female', 2), ('boys', 'Boys', 3);
+VALUES ('trans', 'Trans', 1), ('sluts', 'Sluts', 2), ('twinks', 'Twinks', 3);

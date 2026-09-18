@@ -4,16 +4,16 @@ import CategoryCard from '../components/home/CategoryCard';
 import GameSetupModal from '../components/home/GameSetupModal';
 import { apiClient } from '../lib/apiClient';
 
-type Scope = 'male' | 'female' | 'boys' | 'mix';
+type Scope = 'trans' | 'sluts' | 'twinks' | 'mix';
 
 const CARDS: { scope: Scope; label: string; accentClassName: string }[] = [
-  { scope: 'male', label: 'Male', accentClassName: 'bg-category-male' },
-  { scope: 'female', label: 'Female', accentClassName: 'bg-category-female' },
-  { scope: 'boys', label: 'Boys', accentClassName: 'bg-category-boys' },
+  { scope: 'trans', label: 'Trans', accentClassName: 'bg-category-trans' },
+  { scope: 'sluts', label: 'Sluts', accentClassName: 'bg-category-sluts' },
+  { scope: 'twinks', label: 'Twinks', accentClassName: 'bg-category-twinks' },
   {
     scope: 'mix',
     label: 'Mix',
-    accentClassName: 'bg-gradient-to-r from-category-male via-category-female to-category-boys',
+    accentClassName: 'bg-gradient-to-r from-category-trans via-category-sluts to-category-twinks',
   },
 ];
 
@@ -36,9 +36,9 @@ export default function HomePage() {
       return copy;
     }
     return {
-      male: shuffle(data?.male ?? []),
-      female: shuffle(data?.female ?? []),
-      boys: shuffle(data?.boys ?? []),
+      trans: shuffle(data?.trans ?? []),
+      sluts: shuffle(data?.sluts ?? []),
+      twinks: shuffle(data?.twinks ?? []),
       mix: shuffle(data?.mix ?? []),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

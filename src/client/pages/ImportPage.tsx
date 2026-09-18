@@ -2,20 +2,30 @@ import { useMemo, useState } from 'react';
 import { useCharacters, useCreateCharacter } from '../hooks/useCharacters';
 import LabelMultiSelect from '../components/shared/LabelMultiSelect';
 import ImageUrlListEditor from '../components/shared/ImageUrlListEditor';
+import CategoryCrawlerSection from '../components/import/CategoryCrawlerSection';
+import BatchInputSection from '../components/import/BatchInputSection';
+import RowByRowReviewer, { type QueueItem } from '../components/import/RowByRowReviewer';
 
-const CATEGORY_OPTIONS: { value: 'male' | 'female' | 'boys'; label: string }[] = [
-  { value: 'male', label: 'Male' },
-  { value: 'female', label: 'Female' },
-  { value: 'boys', label: 'Boys' },
+const CATEGORY_OPTIONS: { value: 'trans' | 'sluts' | 'twinks'; label: string }[] = [
+  { value: 'trans', label: 'Trans' },
+  { value: 'sluts', label: 'Sluts' },
+  { value: 'twinks', label: 'Twinks' },
 ];
 
 export default function ImportPage() {
+  const [importMode, setImportMode] = useState<'crawler' | 'batch' | 'manual'>('crawler');
+
+  // Single manual form state
   const [name, setName] = useState('');
-  const [categoryKey, setCategoryKey] = useState<'male' | 'female' | 'boys'>('male');
+  const [categoryKey, setCategoryKey] = useState<'trans' | 'sluts' | 'twinks'>('sluts');
   const [labelIds, setLabelIds] = useState<number[]>([]);
   const [images, setImages] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [manualError, setManualError] = useState<string | null>(null);
+  const [manualSuccess, setManualSuccess] = useState<string | null>(null);
+
+  // Reviewer Queue state
+  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [isSavingBatch, setIsSavingBatch] = useState(false);
 
   const createCharacter = useCreateCharacter();
   const { data: allCharacters = [] } = useCharacters({});
@@ -29,115 +39,272 @@ export default function ImportPage() {
     return duplicate ? `A character named "${duplicate.name}" already exists in this category.` : null;
   }, [allCharacters, name, categoryKey]);
 
-  function resetForm() {
+  function resetManualForm() {
     setName('');
     setLabelIds([]);
     setImages([]);
   }
 
-  async function handleSubmit() {
+  async function handleManualSubmit() {
     const trimmedName = name.trim();
-    setSuccessMessage(null);
+    setManualSuccess(null);
     if (!trimmedName) {
-      setError('Name is required.');
+      setManualError('Name is required.');
       return;
     }
     if (images.length === 0) {
-      setError('At least 1 image URL is required.');
+      setManualError('At least 1 image URL is required.');
       return;
     }
     try {
-      setError(null);
+      setManualError(null);
       const created = await createCharacter.mutateAsync({
         name: trimmedName,
         categoryKey,
         labelIds,
         images: images.map((url) => ({ url })),
       });
-      setSuccessMessage(`"${created.name}" was added.`);
-      resetForm();
+      setManualSuccess(`"${created.name}" was added successfully.`);
+      resetManualForm();
     } catch {
-      setError('Could not create this character. Please try again.');
+      setManualError('Could not create this character. Please try again.');
     }
+  }
+
+  // Queue actions
+  function handleLoadQueue(newItems: QueueItem[], append = false) {
+    if (append) {
+      setQueue((prev) => [...prev, ...newItems]);
+    } else {
+      setQueue(newItems);
+    }
+  }
+
+  function handleUpdateQueueItem(id: string, updates: Partial<QueueItem>) {
+    setQueue((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
+    );
+  }
+
+  async function handleSaveQueueItem(item: QueueItem): Promise<boolean> {
+    const trimmedName = item.name.trim();
+    if (!trimmedName) {
+      handleUpdateQueueItem(item.id, { error: 'Name is required.', status: 'failed' });
+      return false;
+    }
+    if (item.selectedImages.length === 0) {
+      handleUpdateQueueItem(item.id, {
+        error: 'Select at least 1 image for this character in the bottom tray.',
+        status: 'failed',
+      });
+      return false;
+    }
+
+    try {
+      handleUpdateQueueItem(item.id, { error: undefined });
+      await createCharacter.mutateAsync({
+        name: trimmedName,
+        categoryKey: item.categoryKey,
+        labelIds: item.labelIds,
+        images: item.selectedImages.map((url) => ({ url })),
+      });
+      handleUpdateQueueItem(item.id, { status: 'imported', error: undefined });
+      return true;
+    } catch {
+      handleUpdateQueueItem(item.id, {
+        error: 'Server error saving character. Please retry.',
+        status: 'failed',
+      });
+      return false;
+    }
+  }
+
+  const SAVE_CONCURRENCY = 4;
+
+  async function handleSaveAllReady() {
+    setIsSavingBatch(true);
+    const readyItems = queue.filter(
+      (item) => item.status === 'pending' && item.name.trim() && item.selectedImages.length > 0
+    );
+
+    // Save in small concurrent batches instead of one request at a time,
+    // so a large batch doesn't wait on N sequential network round-trips.
+    for (let i = 0; i < readyItems.length; i += SAVE_CONCURRENCY) {
+      const chunk = readyItems.slice(i, i + SAVE_CONCURRENCY);
+      await Promise.all(chunk.map((item) => handleSaveQueueItem(item)));
+    }
+    setIsSavingBatch(false);
+  }
+
+  function handleClearQueue() {
+    setQueue([]);
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-fg">Smart Import</h1>
-        <p className="text-fg-muted mt-1">Add a new character to your collection.</p>
+      {/* Header & Modes */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-fg">Character Importer &amp; Crawler</h1>
+          <p className="text-fg-muted mt-1">
+            Crawl target category URLs, review characters row-by-row, and pick candidate images from the bottom tray.
+          </p>
+        </div>
+
+        {/* Mode Buttons */}
+        <div className="flex items-center rounded-button bg-bg-card border border-bg-hover p-1">
+          <button
+            type="button"
+            onClick={() => setImportMode('crawler')}
+            className={`rounded-button px-3.5 py-1.5 text-xs font-semibold transition-all ${
+              importMode === 'crawler'
+                ? 'bg-category-trans text-white shadow-sm'
+                : 'text-fg-muted hover:text-fg'
+            }`}
+          >
+            🌐 Web Crawler
+          </button>
+          <button
+            type="button"
+            onClick={() => setImportMode('batch')}
+            className={`rounded-button px-3.5 py-1.5 text-xs font-semibold transition-all ${
+              importMode === 'batch'
+                ? 'bg-category-trans text-white shadow-sm'
+                : 'text-fg-muted hover:text-fg'
+            }`}
+          >
+            📋 Paste Text/JSON
+          </button>
+          <button
+            type="button"
+            onClick={() => setImportMode('manual')}
+            className={`rounded-button px-3.5 py-1.5 text-xs font-semibold transition-all ${
+              importMode === 'manual'
+                ? 'bg-category-trans text-white shadow-sm'
+                : 'text-fg-muted hover:text-fg'
+            }`}
+          >
+            ✍ Single Manual Add
+          </button>
+        </div>
       </div>
 
-      <div className="max-w-xl rounded-card border border-bg-hover bg-bg-card p-6 flex flex-col gap-5">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold uppercase tracking-wider text-fg-dim">Name</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Character name"
-            className="rounded-button border border-bg-hover bg-bg-muted px-3 py-2 text-sm text-fg"
-          />
-          {duplicateWarning ? (
-            <span className="text-xs text-amber-400">{duplicateWarning}</span>
+      {/* MODE 1: Web Crawler */}
+      {importMode === 'crawler' ? (
+        <div className="flex flex-col gap-6">
+          <CategoryCrawlerSection onLoadQueue={handleLoadQueue} />
+
+          {queue.length > 0 ? (
+            <RowByRowReviewer
+              queue={queue}
+              allCharacters={allCharacters}
+              onUpdateItem={handleUpdateQueueItem}
+              onSaveItem={handleSaveQueueItem}
+              onSaveAllReady={handleSaveAllReady}
+              onClearQueue={handleClearQueue}
+              isSavingBatch={isSavingBatch}
+            />
+          ) : (
+            <div className="rounded-card border border-dashed border-bg-hover bg-bg-card/40 p-8 text-center text-fg-dim flex flex-col items-center justify-center gap-2">
+              <span className="text-3xl">📥</span>
+              <p className="text-sm font-medium text-fg-muted">Queue is currently empty</p>
+              <p className="text-xs max-w-md">
+                Select one of the 3 category buttons above (Trans / Sluts / Twinks), verify the URL variable and page number, then click <strong>&quot;🚀 Crawl Page&quot;</strong> to start reviewing characters row-by-row.
+              </p>
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {/* MODE 2: Batch Text / JSON Input */}
+      {importMode === 'batch' ? (
+        <div className="flex flex-col gap-6">
+          <BatchInputSection onLoadQueue={handleLoadQueue} />
+
+          {queue.length > 0 ? (
+            <RowByRowReviewer
+              queue={queue}
+              allCharacters={allCharacters}
+              onUpdateItem={handleUpdateQueueItem}
+              onSaveItem={handleSaveQueueItem}
+              onSaveAllReady={handleSaveAllReady}
+              onClearQueue={handleClearQueue}
+              isSavingBatch={isSavingBatch}
+            />
           ) : null}
         </div>
+      ) : null}
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold uppercase tracking-wider text-fg-dim">
-            Category
-          </label>
-          <select
-            value={categoryKey}
-            onChange={(e) => setCategoryKey(e.target.value as 'male' | 'female' | 'boys')}
-            className="rounded-button border border-bg-hover bg-bg-muted px-3 py-2 text-sm text-fg"
+      {/* MODE 3: Single Manual Form */}
+      {importMode === 'manual' ? (
+        <div className="max-w-xl rounded-card border border-bg-hover bg-bg-card p-6 flex flex-col gap-5">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-fg-dim">
+              Character Name
+            </label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Character Name"
+              className="rounded-button border border-bg-hover bg-bg-muted px-3 py-2 text-sm text-fg"
+            />
+            {duplicateWarning ? (
+              <span className="text-xs text-amber-400">{duplicateWarning}</span>
+            ) : null}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-fg-dim">
+              Category
+            </label>
+            <select
+              value={categoryKey}
+              onChange={(e) => setCategoryKey(e.target.value as 'trans' | 'sluts' | 'twinks')}
+              className="rounded-button border border-bg-hover bg-bg-muted px-3 py-2 text-sm text-fg"
+            >
+              {CATEGORY_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-fg-dim">
+              Labels
+            </label>
+            <LabelMultiSelect selectedIds={labelIds} onChange={setLabelIds} />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-fg-dim">
+              Images (1&ndash;6 URLs)
+            </label>
+            <ImageUrlListEditor value={images} onChange={setImages} />
+          </div>
+
+          {manualError ? (
+            <div className="rounded-button bg-rose-500/10 border border-rose-500/30 px-3 py-2 text-sm text-rose-300">
+              {manualError}
+            </div>
+          ) : null}
+          {manualSuccess ? (
+            <div className="rounded-button bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-sm text-emerald-300">
+              {manualSuccess}
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={handleManualSubmit}
+            disabled={createCharacter.isPending}
+            className="rounded-button bg-category-trans px-4 py-2.5 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            {CATEGORY_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            {createCharacter.isPending ? 'Adding...' : 'Add character'}
+          </button>
         </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold uppercase tracking-wider text-fg-dim">Labels</label>
-          <LabelMultiSelect selectedIds={labelIds} onChange={setLabelIds} />
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold uppercase tracking-wider text-fg-dim">
-            Images (1&ndash;6 URLs)
-          </label>
-          <ImageUrlListEditor value={images} onChange={setImages} />
-        </div>
-
-        {error ? (
-          <div className="rounded-button bg-rose-500/10 border border-rose-500/30 px-3 py-2 text-sm text-rose-300">
-            {error}
-          </div>
-        ) : null}
-        {successMessage ? (
-          <div className="rounded-button bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-sm text-emerald-300">
-            {successMessage}
-          </div>
-        ) : null}
-
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={createCharacter.isPending}
-          className="rounded-button bg-category-male px-4 py-2.5 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-        >
-          {createCharacter.isPending ? 'Adding...' : 'Add character'}
-        </button>
-      </div>
-
-      <div className="max-w-xl rounded-card border border-dashed border-bg-hover bg-bg-card/50 p-6 opacity-60">
-        <h2 className="font-semibold text-fg-muted">More import methods coming soon</h2>
-        <p className="text-sm text-fg-dim mt-1">
-          Bulk and AI-assisted import will be added here later.
-        </p>
-      </div>
+      ) : null}
     </div>
   );
 }
