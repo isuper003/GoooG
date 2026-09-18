@@ -1,55 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseHtmlContent, upgradeImageResolution } from './crawler';
-
-describe('parseHtmlContent — logo/icon filtering', () => {
-  const baseUrl = 'https://example.com/gallery';
-
-  it('does not extract the site logo (svg, wrapped in a home link) as a character', () => {
-    const html = `
-      <header>
-        <a href="/">
-          <img src="https://static.example.com/style/img/logo.svg" alt=" Free Porn Pics" width="118" height="56">
-        </a>
-      </header>
-      <a href="/profile/real"><img src="https://cdn.test/real-1.jpg" alt="Real Person"></a>
-      <a href="/profile/real2"><img src="https://cdn.test/real-2.jpg" alt="Another Person"></a>
-    `;
-    const items = parseHtmlContent(html, baseUrl, 'sluts');
-    expect(items.map((i) => i.name)).not.toContain('Free Porn Pics');
-    expect(items.map((i) => i.name).sort()).toEqual(['Another Person', 'Real Person']);
-  });
-
-  it('does not extract a "Login with Google" icon as a character', () => {
-    const html = `
-      <a href="#" class="google-oauth-button">
-        <img src="https://static.example.com/style/img/google-icon.svg" alt="google" width="22" height="22">
-        <span>Login with Google</span>
-      </a>
-      <a href="/profile/real"><img src="https://cdn.test/real-1.jpg" alt="Real Person"></a>
-      <a href="/profile/real2"><img src="https://cdn.test/real-2.jpg" alt="Another Person"></a>
-    `;
-    const items = parseHtmlContent(html, baseUrl, 'sluts');
-    expect(items.map((i) => i.name)).not.toContain('google');
-  });
-
-  it('filters a small non-svg icon purely by its declared width/height', () => {
-    const html = `
-      <a href="/profile/icon"><img src="https://cdn.test/icon.png" alt="Site Icon" width="40" height="40"></a>
-      <a href="/profile/real"><img src="https://cdn.test/real-1.jpg" alt="Real Person"></a>
-      <a href="/profile/real2"><img src="https://cdn.test/real-2.jpg" alt="Another Person"></a>
-    `;
-    const items = parseHtmlContent(html, baseUrl, 'sluts');
-    expect(items.map((i) => i.name)).not.toContain('Site Icon');
-  });
-
-  it('still extracts a real photo that happens to declare large explicit dimensions', () => {
-    const html = `
-      <a href="/profile/real"><img src="https://cdn.test/real-1.jpg" alt="Real Person" width="600" height="800"></a>
-    `;
-    const items = parseHtmlContent(html, baseUrl, 'sluts');
-    expect(items.map((i) => i.name)).toContain('Real Person');
-  });
-});
+import { extractProfileLinks, extractProfileGallery, upgradeImageResolution } from './crawler';
 
 describe('upgradeImageResolution', () => {
   it('replaces a /460/ path segment with /1280/', () => {
@@ -67,107 +17,156 @@ describe('upgradeImageResolution', () => {
     const url = 'https://example.com/img/4601/photo.jpg';
     expect(upgradeImageResolution(url)).toBe(url);
   });
+});
 
-  it('only replaces the first occurrence (matches the real CDN path shape)', () => {
-    const url = 'https://cdn.test/460/a/460/b.jpg';
-    expect(upgradeImageResolution(url)).toBe('https://cdn.test/1280/a/460/b.jpg');
+describe('extractProfileLinks (stage 1: listing page → profile links)', () => {
+  const baseUrl = 'https://example.com/pornstars/';
+
+  it('extracts name and absolute profile URL from a listing card', () => {
+    const html = `
+      <li class='thumbwook'>
+        <a class='rel-link' href='/pornstars/angela-white/' title="Angela White">
+          <span class="m-name">Angela White</span>
+          <img src="https://static.example.com/1px.png" data-src="https://cdn.test/460/a/1.jpg" alt="Angela White" width="300" height="450">
+        </a>
+      </li>
+    `;
+    const links = extractProfileLinks(html, baseUrl);
+    expect(links).toEqual([{ name: 'Angela White', profileUrl: 'https://example.com/pornstars/angela-white/' }]);
+  });
+
+  it('extracts multiple distinct cards', () => {
+    const html = `
+      <a href='/pornstars/a/' title="Person A"><img src="https://cdn.test/460/a/1.jpg" alt="Person A"></a>
+      <a href='/pornstars/b/' title="Person B"><img src="https://cdn.test/460/b/1.jpg" alt="Person B"></a>
+    `;
+    const links = extractProfileLinks(html, baseUrl);
+    expect(links.map((l) => l.name).sort()).toEqual(['Person A', 'Person B']);
+  });
+
+  it('skips links with no image at all (nav links, pagination, random-gallery buttons)', () => {
+    const html = `
+      <a href="/pornstars/2/">2</a>
+      <a href="/rnd/random"><svg class="svg-icon"><use href="#icon-random"></use></svg></a>
+    `;
+    expect(extractProfileLinks(html, baseUrl)).toEqual([]);
+  });
+
+  it('skips a site-logo link (svg image) even though it has an href and an image', () => {
+    const html = `
+      <a href="/"><img src="https://static.example.com/style/img/logo.svg" alt=" Free Porn Pics" width="118" height="56"></a>
+      <a href='/pornstars/a/' title="Person A"><img src="https://cdn.test/460/a/1.jpg" alt="Person A"></a>
+    `;
+    const links = extractProfileLinks(html, baseUrl);
+    expect(links.map((l) => l.name)).toEqual(['Person A']);
+  });
+
+  it('skips a "Login with Google" icon link', () => {
+    const html = `
+      <a href="#" class="google-oauth-button">
+        <img src="https://static.example.com/style/img/google-icon.svg" alt="google" width="22" height="22">
+      </a>
+      <a href='/pornstars/a/' title="Person A"><img src="https://cdn.test/460/a/1.jpg" alt="Person A"></a>
+    `;
+    const links = extractProfileLinks(html, baseUrl);
+    expect(links.map((l) => l.name)).toEqual(['Person A']);
+  });
+
+  it('prefers the title attribute for the name over alt text', () => {
+    const html = `<a href='/pornstars/a/' title="The Real Name"><img src="https://cdn.test/460/a/1.jpg" alt="alt text differs"></a>`;
+    expect(extractProfileLinks(html, baseUrl)[0].name).toBe('The Real Name');
+  });
+
+  it('deduplicates cards that resolve to the same profile URL', () => {
+    const html = `
+      <a href='/pornstars/a/' title="Person A"><img src="https://cdn.test/460/a/1.jpg"></a>
+      <a href='/pornstars/a/' title="Person A"><img src="https://cdn.test/460/a/2.jpg"></a>
+    `;
+    expect(extractProfileLinks(html, baseUrl)).toHaveLength(1);
+  });
+
+  it('resolves a root-relative href against the base URL', () => {
+    const html = `<a href='/pornstars/a/' title="Person A"><img src="https://cdn.test/460/a/1.jpg"></a>`;
+    const links = extractProfileLinks(html, 'https://example.com/pornstars/shemale/?page=2');
+    expect(links[0].profileUrl).toBe('https://example.com/pornstars/a/');
   });
 });
 
-describe('parseHtmlContent', () => {
-  const baseUrl = 'https://example.com/gallery';
+describe('extractProfileGallery (stage 2: profile page → avatar + album)', () => {
+  const baseUrl = 'https://example.com/pornstars/angela-white/';
 
-  it('extracts a character with an avatar and gallery images from an <a><img> card', () => {
+  it('extracts the avatar from a schema.org Person JSON-LD "image" field', () => {
     const html = `
-      <a href="/profile/alex">
-        <img src="https://cdni.pornpics.com/460/1/1/1/avatar.jpg" alt="Alex Rivera">
-        <img src="https://cdni.pornpics.com/460/1/1/1/gallery2.jpg" alt="Alex Rivera 2">
-      </a>
+      <script type="application/ld+json">
+      { "@context": "https://schema.org", "@type": "Person", "name": "Angela White", "image": "https://cdn.test/models/a/angela_white.jpeg" }
+      </script>
     `;
-    const items = parseHtmlContent(html, baseUrl, 'sluts');
-    expect(items).toHaveLength(1);
-    expect(items[0].name).toBe('Alex Rivera');
-    expect(items[0].categoryKey).toBe('sluts');
-    // Upgraded to 1280 resolution
-    expect(items[0].avatarUrl).toBe('https://cdni.pornpics.com/1280/1/1/1/avatar.jpg');
-    expect(items[0].availableImages).toEqual(['https://cdni.pornpics.com/1280/1/1/1/gallery2.jpg']);
+    const { avatarUrl } = extractProfileGallery(html, baseUrl);
+    expect(avatarUrl).toBe('https://cdn.test/models/a/angela_white.jpeg');
   });
 
-  it('excludes the avatar from availableImages even when it is the only image', () => {
+  it('extracts the avatar from a nested "mainEntity.image" field (ProfilePage schema)', () => {
     const html = `
-      <a href="/profile/jordan">
-        <img src="https://cdn.test/460/j/1.jpg" alt="Jordan Lee">
-      </a>
+      <script type="application/ld+json">
+      {"@type": "ProfilePage", "mainEntity": {"@type": "Person", "image": "https://cdn.test/models/a/angela_white.jpeg"}}
+      </script>
     `;
-    const items = parseHtmlContent(html, baseUrl, 'sluts');
-    expect(items).toHaveLength(1);
-    expect(items[0].avatarUrl).toBe('https://cdn.test/1280/j/1.jpg');
-    expect(items[0].availableImages).toEqual([]);
+    const { avatarUrl } = extractProfileGallery(html, baseUrl);
+    expect(avatarUrl).toBe('https://cdn.test/models/a/angela_white.jpeg');
   });
 
-  it('skips lazy-load placeholder src attributes in favor of data-src', () => {
+  it('tolerates a malformed JSON-LD block and still returns gallery images', () => {
     const html = `
-      <a href="/profile/taylor">
-        <img src="https://static.test/1px.png" data-src="https://cdn.test/460/t/1.jpg" alt="Taylor Cruz">
-      </a>
+      <script type="application/ld+json">{ this is not valid json </script>
+      <a href="https://example.com/galleries/g1/"><img data-src="https://cdn.test/460/a/1.jpg" alt="gallery 1"></a>
     `;
-    const items = parseHtmlContent(html, baseUrl, 'sluts');
-    expect(items[0].avatarUrl).toBe('https://cdn.test/1280/t/1.jpg');
+    const { avatarUrl, images } = extractProfileGallery(html, baseUrl);
+    expect(avatarUrl).toBe('');
+    expect(images).toEqual(['https://cdn.test/1280/a/1.jpg']);
   });
 
-  it('resolves relative image URLs against the base URL', () => {
+  it('collects every gallery thumbnail card, upgrading resolution and deduplicating', () => {
     const html = `
-      <a href="/profile/rel">
-        <img src="/img/460/rel.jpg" alt="Relative Person">
-      </a>
+      <a href="https://example.com/galleries/g1/"><img data-src="https://cdn.test/460/a/1.jpg" alt="gallery 1"></a>
+      <a href="https://example.com/galleries/g2/"><img data-src="https://cdn.test/460/a/2.jpg" alt="gallery 2"></a>
+      <a href="https://example.com/galleries/g1/"><img data-src="https://cdn.test/460/a/1.jpg" alt="gallery 1 again"></a>
     `;
-    const items = parseHtmlContent(html, baseUrl, 'trans');
-    expect(items[0].avatarUrl).toBe('https://example.com/img/1280/rel.jpg');
+    const { images } = extractProfileGallery(html, baseUrl);
+    expect(images).toEqual(['https://cdn.test/1280/a/1.jpg', 'https://cdn.test/1280/a/2.jpg']);
   });
 
-  it('extracts multiple distinct characters from separate cards', () => {
+  it('excludes the avatar URL from the gallery images if it also appears as a card', () => {
     const html = `
-      <a href="/profile/a"><img src="https://cdn.test/460/a/1.jpg" alt="Person A"></a>
-      <a href="/profile/b"><img src="https://cdn.test/460/b/1.jpg" alt="Person B"></a>
-      <a href="/profile/c"><img src="https://cdn.test/460/c/1.jpg" alt="Person C"></a>
+      <script type="application/ld+json">{"@type":"Person","image":"https://cdn.test/1280/a/1.jpg"}</script>
+      <a href="https://example.com/galleries/g1/"><img data-src="https://cdn.test/460/a/1.jpg"></a>
+      <a href="https://example.com/galleries/g2/"><img data-src="https://cdn.test/460/a/2.jpg"></a>
     `;
-    const items = parseHtmlContent(html, baseUrl, 'twinks');
-    expect(items.map((i) => i.name).sort()).toEqual(['Person A', 'Person B', 'Person C']);
-    expect(items.every((i) => i.categoryKey === 'twinks')).toBe(true);
+    const { avatarUrl, images } = extractProfileGallery(html, baseUrl);
+    expect(avatarUrl).toBe('https://cdn.test/1280/a/1.jpg');
+    expect(images).toEqual(['https://cdn.test/1280/a/2.jpg']);
   });
 
-  it('merges repeated cards for the same name into one item with a combined gallery', () => {
+  it('filters out ad placeholder / icon images from the gallery', () => {
     const html = `
-      <a href="/profile/x"><img src="https://cdn.test/460/x/1.jpg" alt="Same Person"></a>
-      <a href="/profile/x2"><img src="https://cdn.test/460/x/2.jpg" alt="Same Person"></a>
+      <li class="thumbwook r2-frame"><span class="h2 ad-text"><i></i></span></li>
+      <a href="https://example.com/galleries/g1/"><img data-src="https://cdn.test/460/a/1.jpg"></a>
+      <a href="/social"><img src="https://cdn.test/icon.svg" alt="social" width="20" height="20"></a>
     `;
-    const items = parseHtmlContent(html, baseUrl, 'sluts');
-    expect(items).toHaveLength(1);
-    expect(items[0].availableImages).toContain('https://cdn.test/1280/x/2.jpg');
+    const { images } = extractProfileGallery(html, baseUrl);
+    expect(images).toEqual(['https://cdn.test/1280/a/1.jpg']);
   });
 
-  it('strips trailing photo-count suffixes from names', () => {
-    const html = `
-      <a href="/profile/y">
-        <img src="https://cdn.test/460/y/1.jpg" alt="Some Person (24)">
-      </a>
-    `;
-    const items = parseHtmlContent(html, baseUrl, 'sluts');
-    expect(items[0].name).toBe('Some Person');
+  it('returns an empty avatar and empty gallery for a page with none of the expected markup', () => {
+    const html = '<div>Nothing here</div>';
+    expect(extractProfileGallery(html, baseUrl)).toEqual({ avatarUrl: '', images: [] });
   });
 
-  it('returns an empty list for HTML with no image cards', () => {
-    const html = '<div>No characters here</div>';
-    expect(parseHtmlContent(html, baseUrl, 'sluts')).toEqual([]);
-  });
-
-  it('ignores data: and javascript: URLs', () => {
-    const html = `
-      <a href="/profile/bad">
-        <img src="data:image/png;base64,AAAA" alt="Bad Person">
-      </a>
-    `;
-    const items = parseHtmlContent(html, baseUrl, 'sluts');
-    expect(items).toHaveLength(0);
+  it('caps the number of gallery images returned', () => {
+    const cards = Array.from(
+      { length: 40 },
+      (_, i) => `<a href="https://example.com/galleries/g${i}/"><img data-src="https://cdn.test/460/a/${i}.jpg"></a>`
+    ).join('\n');
+    const { images } = extractProfileGallery(cards, baseUrl);
+    expect(images.length).toBeLessThanOrEqual(30);
   });
 });

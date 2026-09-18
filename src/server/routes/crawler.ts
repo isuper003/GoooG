@@ -17,6 +17,26 @@ export interface ExtractedItem {
   availableImages: string[]; // Gallery images, excluding profile avatar
 }
 
+interface ProfileLink {
+  name: string;
+  profileUrl: string;
+}
+
+const FETCH_HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+};
+
+// A listing page only links to each character's own profile page and shows one
+// preview thumbnail — the real photo album lives on that profile page. Cap how
+// many profile pages we follow per crawl to stay well under the Workers
+// subrequest limit and keep one crawl action fast.
+const MAX_PROFILES_PER_CRAWL = 40;
+const PROFILE_FETCH_CONCURRENCY = 6;
+const MAX_GALLERY_IMAGES = 30;
+
 // Some gallery CDNs (e.g. pornpics.com's cdni.pornpics.com) serve a small
 // thumbnail by default at a "/460/" size segment in the path, with a much
 // larger "/1280/" version available at the same path otherwise. Swap it in
@@ -44,7 +64,7 @@ function isLikelyLogoOrIcon(fullImgTag: string, resolvedUrl: string): boolean {
   return false;
 }
 
-// Helper to make relative URL absolute
+// Helper to make a possibly-relative URL absolute (and upgrade its resolution)
 function toAbsoluteUrl(urlStr: string, baseUrl: string): string | null {
   try {
     const trimmed = urlStr.trim();
@@ -68,47 +88,71 @@ function cleanName(raw: string): string {
     .trim();
 }
 
-// Parse HTML string into character items with profile avatar and gallery candidate images
-export function parseHtmlContent(
-  html: string,
-  baseUrl: string,
-  categoryKey: 'trans' | 'sluts' | 'twinks'
-): ExtractedItem[] {
-  const itemsMap = new Map<string, { avatarUrl: string; galleryImages: Set<string> }>();
+function getAttr(tag: string, attr: string): string | null {
+  const m = tag.match(new RegExp(`${attr}=["']([^"']+)["']`, 'i'));
+  return m ? m[1] : null;
+}
 
-  // Pattern 1: Match <a> or <div> card blocks containing an image and text/alt/title
-  // Look for cards/links: <a href="..." ...> ... <img ...> ... (name/title) </a>
-  const cardRegex = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+// Picks the real photo URL out of an <img> tag, skipping lazy-load
+// placeholders (a 1x1 pixel or "blank" gif in `src` while the actual image
+// sits in a data-* attribute).
+function bestImageSrc(imgTag: string): string | null {
+  const candidates = [
+    getAttr(imgTag, 'data-original'),
+    getAttr(imgTag, 'data-src'),
+    getAttr(imgTag, 'data-lazy'),
+    getAttr(imgTag, 'data-thumb'),
+    getAttr(imgTag, 'src'),
+  ];
+  for (const candidate of candidates) {
+    if (candidate && !candidate.includes('1px') && !candidate.includes('blank')) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+// Stage 1: a listing/category page links to each character's own profile page
+// via an <a href><img></a> card. We only need the name and that profile link
+// here — the actual gallery is fetched separately from the profile page.
+export function extractProfileLinks(html: string, baseUrl: string): ProfileLink[] {
+  const cardRegex = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
+  const seen = new Map<string, ProfileLink>();
   let match: RegExpExecArray | null;
 
   while ((match = cardRegex.exec(html)) !== null) {
+    const openTagAttrs = match[1];
     const innerHtml = match[2];
     if (!innerHtml) continue;
 
-    // Check if innerHtml has an <img> tag
-    const imgMatches = [...innerHtml.matchAll(/<img\s+[^>]+>/gi)];
+    const hrefRaw = getAttr(openTagAttrs, 'href');
+    if (!hrefRaw) continue;
 
+    const imgMatches = [...innerHtml.matchAll(/<img\s+[^>]+>/gi)];
     if (imgMatches.length === 0) continue;
 
-    // Try to extract name from alt, title, or text inside the anchor
-    let foundName = '';
+    // Skip cards whose only image is a logo/icon (nav/login buttons etc.) —
+    // no point spending a subrequest "visiting the profile" of a login button.
+    const hasRealImage = imgMatches.some((imgMatch) => {
+      const src = bestImageSrc(imgMatch[0]);
+      if (!src) return false;
+      const abs = toAbsoluteUrl(src, baseUrl);
+      return !!abs && (abs.startsWith('http://') || abs.startsWith('https://')) && !isLikelyLogoOrIcon(imgMatch[0], abs);
+    });
+    if (!hasRealImage) continue;
 
-    // 1. From img alt or title
-    for (const imgMatch of imgMatches) {
-      const fullImgTag = imgMatch[0];
-      const altMatch = fullImgTag.match(/alt=["']([^"']+)["']/i);
-      const titleMatch = fullImgTag.match(/title=["']([^"']+)["']/i);
-      if (altMatch && altMatch[1]?.trim()) {
-        foundName = altMatch[1].trim();
-        break;
-      }
-      if (titleMatch && titleMatch[1]?.trim()) {
-        foundName = titleMatch[1].trim();
-        break;
+    let foundName = getAttr(openTagAttrs, 'title') || '';
+
+    if (!foundName) {
+      for (const imgMatch of imgMatches) {
+        const altMatch = imgMatch[0].match(/alt=["']([^"']+)["']/i);
+        if (altMatch && altMatch[1]?.trim()) {
+          foundName = altMatch[1].trim();
+          break;
+        }
       }
     }
 
-    // 2. From text nodes inside the anchor (e.g. <span>Name</span>)
     if (!foundName) {
       const textOnly = innerHtml.replace(/<[^>]+>/g, ' ').trim();
       if (textOnly && textOnly.length >= 2 && textOnly.length <= 60) {
@@ -116,181 +160,129 @@ export function parseHtmlContent(
       }
     }
 
-    // Clean the extracted name
     foundName = cleanName(foundName);
     if (!foundName || foundName.length < 2) continue;
 
-    // Collect all valid image URLs from this card
-    const urls: string[] = [];
+    const profileUrl = toAbsoluteUrl(hrefRaw, baseUrl);
+    if (!profileUrl || !(profileUrl.startsWith('http://') || profileUrl.startsWith('https://'))) continue;
+
+    if (!seen.has(profileUrl)) {
+      seen.set(profileUrl, { name: foundName, profileUrl });
+    }
+  }
+
+  return Array.from(seen.values());
+}
+
+// Stage 2: pull the real portrait and the full photo album off one
+// character's own profile page.
+export function extractProfileGallery(
+  html: string,
+  baseUrl: string
+): { avatarUrl: string; images: string[] } {
+  let avatarUrl = '';
+
+  // Prefer a schema.org Person/ProfilePage JSON-LD block's "image" field — a
+  // generic, site-independent signal for a profile page's main portrait,
+  // rather than hard-coding one site's CSS class names.
+  const ldJsonBlocks = [
+    ...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi),
+  ];
+  for (const block of ldJsonBlocks) {
+    try {
+      const parsed: unknown = JSON.parse(block[1]);
+      if (!parsed || typeof parsed !== 'object') continue;
+      const record = parsed as Record<string, unknown>;
+      const mainEntity =
+        record.mainEntity && typeof record.mainEntity === 'object'
+          ? (record.mainEntity as Record<string, unknown>)
+          : null;
+      const candidate =
+        (typeof record.image === 'string' && record.image) ||
+        (mainEntity && typeof mainEntity.image === 'string' && mainEntity.image) ||
+        '';
+      if (candidate) {
+        const abs = toAbsoluteUrl(candidate, baseUrl);
+        if (abs) {
+          avatarUrl = abs;
+          break;
+        }
+      }
+    } catch {
+      // Malformed JSON-LD block — try the next one, if any.
+    }
+  }
+
+  // Every <a href><img></a> card on the profile page is a gallery thumbnail.
+  const images: string[] = [];
+  const seen = new Set<string>();
+  const cardRegex = /<a\b[^>]*>([\s\S]*?)<\/a>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = cardRegex.exec(html)) !== null && images.length < MAX_GALLERY_IMAGES) {
+    const imgMatches = [...match[1].matchAll(/<img\s+[^>]+>/gi)];
     for (const imgMatch of imgMatches) {
-      const fullTag = imgMatch[0];
-      
-      const getAttr = (attr: string) => {
-        const m = fullTag.match(new RegExp(`${attr}=["']([^"']+)["']`, 'i'));
-        return m ? m[1] : null;
-      };
-
-      const possibleUrls = [
-        getAttr('data-original'),
-        getAttr('data-src'),
-        getAttr('data-lazy'),
-        getAttr('data-thumb'),
-        getAttr('src'),
-      ];
-
-      let bestUrl = '';
-      for (const p of possibleUrls) {
-        if (p && !p.includes('1px') && !p.includes('blank')) {
-          bestUrl = p;
-          break;
-        }
-      }
-
-      if (bestUrl) {
-        const absUrl = toAbsoluteUrl(bestUrl, baseUrl);
-        if (
-          absUrl &&
-          (absUrl.startsWith('http://') || absUrl.startsWith('https://')) &&
-          !isLikelyLogoOrIcon(fullTag, absUrl)
-        ) {
-          urls.push(absUrl);
-        }
-      }
-    }
-
-    if (urls.length > 0) {
-      const current = itemsMap.get(foundName) || {
-        avatarUrl: urls[0],
-        galleryImages: new Set<string>(),
-      };
-      if (!current.avatarUrl && urls[0]) {
-        current.avatarUrl = urls[0];
-      }
-      // Add other images to galleryImages set
-      urls.forEach((u) => {
-        if (u !== current.avatarUrl) {
-          current.galleryImages.add(u);
-        }
-      });
-      itemsMap.set(foundName, current);
+      const src = bestImageSrc(imgMatch[0]);
+      if (!src) continue;
+      const abs = toAbsoluteUrl(src, baseUrl);
+      if (!abs || !(abs.startsWith('http://') || abs.startsWith('https://'))) continue;
+      if (isLikelyLogoOrIcon(imgMatch[0], abs)) continue;
+      if (abs === avatarUrl || seen.has(abs)) continue;
+      seen.add(abs);
+      images.push(abs);
+      if (images.length >= MAX_GALLERY_IMAGES) break;
     }
   }
 
-  // Pattern 2: Fallback if Pattern 1 found fewer than 2 items - scan all <img> tags with alt text
-  if (itemsMap.size < 2) {
-    const standaloneImgRegex = /<img\s+[^>]+>/gi;
-    let imgMatch: RegExpExecArray | null;
-
-    while ((imgMatch = standaloneImgRegex.exec(html)) !== null) {
-      const fullTag = imgMatch[0];
-      
-      const getAttr = (attr: string) => {
-        const m = fullTag.match(new RegExp(`${attr}=["']([^"']+)["']`, 'i'));
-        return m ? m[1] : null;
-      };
-
-      const altMatch = fullTag.match(/alt=["']([^"']+)["']/i) || fullTag.match(/title=["']([^"']+)["']/i);
-      const rawName = cleanName(altMatch ? (altMatch[1] || '') : '');
-      
-      if (!rawName || rawName.length < 2) continue;
-
-      const possibleUrls = [
-        getAttr('data-original'),
-        getAttr('data-src'),
-        getAttr('data-lazy'),
-        getAttr('data-thumb'),
-        getAttr('src'),
-      ];
-
-      let bestUrl = '';
-      for (const p of possibleUrls) {
-        if (p && !p.includes('1px') && !p.includes('blank')) {
-          bestUrl = p;
-          break;
-        }
-      }
-
-      if (bestUrl) {
-        const absUrl = toAbsoluteUrl(bestUrl, baseUrl);
-        if (
-          absUrl &&
-          (absUrl.startsWith('http://') || absUrl.startsWith('https://')) &&
-          !isLikelyLogoOrIcon(fullTag, absUrl)
-        ) {
-          // Skip images Pattern 1 already captured under a card's single name —
-          // otherwise a second <img alt="X 2"> in the same card spawns a bogus
-          // extra "character" for what is really just another photo of X.
-          const alreadyCaptured = Array.from(itemsMap.values()).some(
-            (entry) => entry.avatarUrl === absUrl || entry.galleryImages.has(absUrl)
-          );
-          if (alreadyCaptured) continue;
-
-          const current = itemsMap.get(rawName) || {
-            avatarUrl: absUrl,
-            galleryImages: new Set<string>(),
-          };
-          if (!current.avatarUrl) {
-            current.avatarUrl = absUrl;
-          } else if (absUrl !== current.avatarUrl) {
-            current.galleryImages.add(absUrl);
-          }
-          itemsMap.set(rawName, current);
-        }
-      }
-    }
-  }
-
-  const result: ExtractedItem[] = [];
-  for (const [name, entry] of itemsMap.entries()) {
-    // Exclude profile avatar from availableImages list
-    const galleryList = Array.from(entry.galleryImages).filter((u) => u !== entry.avatarUrl);
-
-    result.push({
-      name,
-      avatarUrl: entry.avatarUrl,
-      categoryKey,
-      availableImages: galleryList,
-    });
-  }
-
-  return result;
+  return { avatarUrl, images };
 }
 
 // POST /api/crawler/fetch
 crawlerRouter.post('/fetch', zValidator('json', crawlerFetchSchema), async (c) => {
   const { url, categoryKey } = c.req.valid('json');
 
+  let listingHtml: string;
   try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        Accept:
-          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-    });
-
+    const response = await fetch(url, { headers: FETCH_HEADERS });
     if (!response.ok) {
       return c.json(
-        {
-          error: `Failed to fetch target URL (Status: ${response.status} ${response.statusText})`,
-        },
+        { error: `Failed to fetch target URL (Status: ${response.status} ${response.statusText})` },
         502
       );
     }
-
-    const html = await response.text();
-    const items = parseHtmlContent(html, url, categoryKey);
-
-    return c.json({
-      url,
-      categoryKey,
-      totalFound: items.length,
-      items,
-    });
+    listingHtml = await response.text();
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown network error';
     return c.json({ error: `Could not crawl URL: ${message}` }, 500);
   }
+
+  const profileLinks = extractProfileLinks(listingHtml, url).slice(0, MAX_PROFILES_PER_CRAWL);
+
+  const items: ExtractedItem[] = [];
+  for (let i = 0; i < profileLinks.length; i += PROFILE_FETCH_CONCURRENCY) {
+    const chunk = profileLinks.slice(i, i + PROFILE_FETCH_CONCURRENCY);
+    const chunkResults = await Promise.all(
+      chunk.map(async (link): Promise<ExtractedItem> => {
+        try {
+          const profileRes = await fetch(link.profileUrl, { headers: FETCH_HEADERS });
+          if (!profileRes.ok) {
+            return { name: link.name, avatarUrl: '', categoryKey, availableImages: [] };
+          }
+          const profileHtml = await profileRes.text();
+          const { avatarUrl, images } = extractProfileGallery(profileHtml, link.profileUrl);
+          return { name: link.name, avatarUrl, categoryKey, availableImages: images };
+        } catch {
+          return { name: link.name, avatarUrl: '', categoryKey, availableImages: [] };
+        }
+      })
+    );
+    items.push(...chunkResults);
+  }
+
+  return c.json({
+    url,
+    categoryKey,
+    totalFound: items.length,
+    items,
+  });
 });
