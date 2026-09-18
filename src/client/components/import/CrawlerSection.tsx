@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { apiClient, ApiError } from '../../lib/apiClient';
 import { DEFAULT_CATEGORY_SOURCE_URLS } from '../../config/crawlerConfig';
 import { useCreateCharacter, useCharacters } from '../../hooks/useCharacters';
 import LabelMultiSelect from '../shared/LabelMultiSelect';
+import BottomImageTray from './BottomImageTray';
 
 export interface CrawlerQueueItem {
   id: string;
@@ -10,6 +11,7 @@ export interface CrawlerQueueItem {
   avatarUrl?: string;
   categoryKey: 'trans' | 'sluts' | 'twinks';
   labelIds: number[];
+  availableImages: string[];
   selectedImages: string[];
   status: 'pending' | 'imported' | 'failed';
   error?: string;
@@ -28,33 +30,17 @@ export default function CrawlerSection() {
   const [isSavingBatch, setIsSavingBatch] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const [urls, setUrls] = useState<Record<'trans' | 'sluts' | 'twinks', string>>(() => {
-    const saved = localStorage.getItem('crawler_category_urls');
-    if (saved) {
-      try {
-        return { ...DEFAULT_CATEGORY_SOURCE_URLS, ...JSON.parse(saved) };
-      } catch {
-        // use defaults
-      }
-    }
-    return DEFAULT_CATEGORY_SOURCE_URLS;
-  });
-
   const [queue, setQueue] = useState<CrawlerQueueItem[]>([]);
-  
+
   const { data: allCharacters = [] } = useCharacters({});
   const createCharacter = useCreateCharacter();
 
-  useEffect(() => {
-    localStorage.setItem('crawler_category_urls', JSON.stringify(urls));
-  }, [urls]);
-
-  const currentTemplate = urls[activeCategory] || '';
+  const currentTemplate = DEFAULT_CATEGORY_SOURCE_URLS[activeCategory] || '';
 
   async function handleCrawl() {
     setErrorMessage(null);
     if (!currentTemplate.trim()) {
-      setErrorMessage(`Please configure the URL variable for ${activeCategory}.`);
+      setErrorMessage(`No source URL is configured for ${activeCategory} in crawlerConfig.ts.`);
       return;
     }
 
@@ -75,13 +61,14 @@ export default function CrawlerSection() {
         return;
       }
 
-      // Auto-select first 6 images
+      // Auto-select the first 6 gallery images; the rest stay browsable in the tray
       const queueItems: CrawlerQueueItem[] = response.items.map((item, idx) => ({
         id: `crawled-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
         name: item.name,
         avatarUrl: item.avatarUrl || '',
         categoryKey: activeCategory,
         labelIds: [],
+        availableImages: item.availableImages,
         selectedImages: item.availableImages.slice(0, 6),
         status: 'pending',
       }));
@@ -102,6 +89,35 @@ export default function CrawlerSection() {
     setQueue((prev) =>
       prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
     );
+  }
+
+  function toggleSelectedImage(item: CrawlerQueueItem, url: string) {
+    if (item.selectedImages.includes(url)) {
+      handleUpdateQueueItem(item.id, { selectedImages: item.selectedImages.filter((u) => u !== url) });
+    } else {
+      if (item.selectedImages.length >= 6) return;
+      handleUpdateQueueItem(item.id, { selectedImages: [...item.selectedImages, url] });
+    }
+  }
+
+  function setPrimaryImage(item: CrawlerQueueItem, url: string) {
+    const filtered = item.selectedImages.filter((u) => u !== url);
+    handleUpdateQueueItem(item.id, { selectedImages: [url, ...filtered] });
+  }
+
+  function addAvailableImage(item: CrawlerQueueItem, url: string) {
+    if (item.availableImages.includes(url)) return;
+    const newAvail = [...item.availableImages, url];
+    const newSelected =
+      item.selectedImages.length < 6 ? [...item.selectedImages, url] : item.selectedImages;
+    handleUpdateQueueItem(item.id, { availableImages: newAvail, selectedImages: newSelected });
+  }
+
+  function removeCandidateImage(item: CrawlerQueueItem, url: string) {
+    handleUpdateQueueItem(item.id, {
+      availableImages: item.availableImages.filter((u) => u !== url),
+      selectedImages: item.selectedImages.filter((u) => u !== url),
+    });
   }
 
   const SAVE_CONCURRENCY = 4;
@@ -218,20 +234,6 @@ export default function CrawlerSection() {
             </div>
           </div>
 
-          {/* URL Editor */}
-          <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
-            <div className="flex items-center justify-between">
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-fg-dim">
-                Source URL Variable
-              </label>
-            </div>
-            <input
-              value={currentTemplate}
-              onChange={(e) => setUrls(p => ({ ...p, [activeCategory]: e.target.value }))}
-              placeholder="URL with {page}"
-              className="w-full rounded-button border border-bg-hover bg-bg-muted px-3 py-2 text-xs font-mono text-fg focus:outline-none focus:border-category-trans"
-            />
-          </div>
         </div>
 
         {/* Start Fetching Button */}
@@ -279,8 +281,8 @@ export default function CrawlerSection() {
               );
               
               return (
-                <div key={item.id} className="relative flex flex-col sm:flex-row gap-4 p-4 rounded-card border border-bg-hover bg-bg-card shadow-sm hover:border-category-trans/50 transition-colors">
-                  
+                <div key={item.id} className="relative flex flex-col gap-4 p-4 rounded-card border border-bg-hover bg-bg-card shadow-sm hover:border-category-trans/50 transition-colors">
+
                   {/* Status overlay badge */}
                   <div className="absolute top-2 right-2 flex gap-2 z-10">
                     {item.status === 'imported' && (
@@ -296,79 +298,70 @@ export default function CrawlerSection() {
                     )}
                   </div>
 
-                  {/* Left: Avatar */}
-                  <div className="shrink-0">
-                    <div className="aspect-square w-24 h-24 rounded-button overflow-hidden border border-bg-hover bg-bg-muted flex items-center justify-center">
-                      {item.avatarUrl ? (
-                         <img
-                           src={item.avatarUrl}
-                           alt={item.name}
-                           referrerPolicy="no-referrer"
-                           className="h-full w-full object-cover"
-                         />
-                      ) : (
-                         <span className="text-3xl opacity-50">👤</span>
-                      )}
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    {/* Avatar next to the name, pulled from the site as-is */}
+                    <div className="shrink-0">
+                      <div className="aspect-square w-14 h-14 rounded-button overflow-hidden border border-bg-hover bg-bg-muted flex items-center justify-center">
+                        {item.avatarUrl ? (
+                           <img
+                             src={item.avatarUrl}
+                             alt={item.name}
+                             referrerPolicy="no-referrer"
+                             className="h-full w-full object-cover"
+                           />
+                        ) : (
+                           <span className="text-2xl opacity-50">👤</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Details */}
+                    <div className="flex-1 flex flex-col gap-3 min-w-[200px]">
+                      <div className="flex flex-col gap-1">
+                         <h4 className="text-lg font-bold text-fg px-1 py-0.5" title="Pulled from the source site as-is">
+                           {item.name}
+                         </h4>
+                         {duplicate && (
+                           <span className="text-[11px] text-amber-400 px-1">⚠️ Exists in {duplicate.categoryKey}</span>
+                         )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-3">
+                        <div className="flex flex-col gap-1 w-32">
+                          <label className="text-[10px] uppercase text-fg-dim px-1">Category</label>
+                          <select
+                            value={item.categoryKey}
+                            onChange={(e) => handleUpdateQueueItem(item.id, { categoryKey: e.target.value as 'trans' | 'sluts' | 'twinks' })}
+                            className="rounded-badge border border-bg-hover bg-bg-muted px-2 py-1 text-xs font-semibold text-fg focus:outline-none"
+                          >
+                             {CATEGORY_OPTIONS.map((opt) => (
+                               <option key={opt.value} value={opt.value}>{opt.label}</option>
+                             ))}
+                          </select>
+                        </div>
+
+                        <div className="flex flex-col gap-1 flex-1 min-w-[150px]">
+                          <label className="text-[10px] uppercase text-fg-dim px-1">Labels</label>
+                          <LabelMultiSelect
+                             selectedIds={item.labelIds}
+                             onChange={(ids) => handleUpdateQueueItem(item.id, { labelIds: ids })}
+                          />
+                        </div>
+                      </div>
+
+                      {item.error && <span className="text-xs text-rose-400 px-1">{item.error}</span>}
                     </div>
                   </div>
 
-                  {/* Middle: Details */}
-                  <div className="flex-1 flex flex-col gap-3 min-w-[200px]">
-                    <div className="flex flex-col gap-1">
-                       <input
-                         value={item.name}
-                         onChange={(e) => handleUpdateQueueItem(item.id, { name: e.target.value })}
-                         className="bg-transparent border-b border-bg-hover hover:border-fg-muted focus:border-category-trans focus:outline-none text-lg font-bold text-fg px-1 py-0.5"
-                         placeholder="Character Name"
-                       />
-                       {duplicate && (
-                         <span className="text-[11px] text-amber-400 px-1">⚠️ Exists in {duplicate.categoryKey}</span>
-                       )}
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-3">
-                      <div className="flex flex-col gap-1 w-32">
-                        <label className="text-[10px] uppercase text-fg-dim px-1">Category</label>
-                        <select
-                          value={item.categoryKey}
-                          onChange={(e) => handleUpdateQueueItem(item.id, { categoryKey: e.target.value as 'trans' | 'sluts' | 'twinks' })}
-                          className="rounded-badge border border-bg-hover bg-bg-muted px-2 py-1 text-xs font-semibold text-fg focus:outline-none"
-                        >
-                           {CATEGORY_OPTIONS.map((opt) => (
-                             <option key={opt.value} value={opt.value}>{opt.label}</option>
-                           ))}
-                        </select>
-                      </div>
-                      
-                      <div className="flex flex-col gap-1 flex-1 min-w-[150px]">
-                        <label className="text-[10px] uppercase text-fg-dim px-1">Labels</label>
-                        <LabelMultiSelect
-                           selectedIds={item.labelIds}
-                           onChange={(ids) => handleUpdateQueueItem(item.id, { labelIds: ids })}
-                        />
-                      </div>
-                    </div>
-                    
-                    {item.error && <span className="text-xs text-rose-400 px-1">{item.error}</span>}
-                  </div>
-
-                  {/* Right: Tiny Thumbnails (First 6 images) */}
-                  <div className="shrink-0 sm:w-[220px] flex flex-col gap-2">
-                    <label className="text-[10px] uppercase text-fg-dim">Images ({item.selectedImages.length})</label>
-                    {item.selectedImages.length > 0 ? (
-                      <div className="grid grid-cols-3 gap-1">
-                        {item.selectedImages.map((img, i) => (
-                           <div key={i} className="aspect-square bg-bg-muted rounded border border-bg-hover overflow-hidden relative group">
-                              <img src={img} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
-                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="h-full border border-dashed border-bg-hover rounded flex items-center justify-center text-xs text-fg-dim">
-                        No images found
-                      </div>
-                    )}
-                  </div>
+                  {/* Horizontal album strip — browse and pick from every photo found for this character */}
+                  <BottomImageTray
+                    availableImages={item.availableImages}
+                    selectedImages={item.selectedImages}
+                    onToggleImage={(url) => toggleSelectedImage(item, url)}
+                    onSetPrimary={(url) => setPrimaryImage(item, url)}
+                    onAddImage={(url) => addAvailableImage(item, url)}
+                    onRemoveCandidate={(url) => removeCandidateImage(item, url)}
+                  />
                 </div>
               );
             })}

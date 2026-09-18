@@ -25,6 +25,25 @@ export function upgradeImageResolution(url: string): string {
   return url.replace(/\/460\//, '/1280/');
 }
 
+// Site logos and third-party badges (e.g. a "Login with Google" icon) are
+// almost always vector graphics or explicitly sized as tiny icons in markup,
+// while real gallery photos are raster images with no such small fixed size.
+// This tells them apart from genuine character photos before they leak in as
+// bogus "characters" named after the site or the login button.
+function isLikelyLogoOrIcon(fullImgTag: string, resolvedUrl: string): boolean {
+  if (/\.svg(?:[?#]|$)/i.test(resolvedUrl)) return true;
+
+  const widthMatch = fullImgTag.match(/\bwidth=["']?(\d+)/i);
+  const heightMatch = fullImgTag.match(/\bheight=["']?(\d+)/i);
+  if (widthMatch && heightMatch) {
+    const w = parseInt(widthMatch[1], 10);
+    const h = parseInt(heightMatch[1], 10);
+    if (w > 0 && h > 0 && w <= 100 && h <= 100) return true;
+  }
+
+  return false;
+}
+
 // Helper to make relative URL absolute
 function toAbsoluteUrl(urlStr: string, baseUrl: string): string | null {
   try {
@@ -129,7 +148,11 @@ export function parseHtmlContent(
 
       if (bestUrl) {
         const absUrl = toAbsoluteUrl(bestUrl, baseUrl);
-        if (absUrl && (absUrl.startsWith('http://') || absUrl.startsWith('https://'))) {
+        if (
+          absUrl &&
+          (absUrl.startsWith('http://') || absUrl.startsWith('https://')) &&
+          !isLikelyLogoOrIcon(fullTag, absUrl)
+        ) {
           urls.push(absUrl);
         }
       }
@@ -189,7 +212,11 @@ export function parseHtmlContent(
 
       if (bestUrl) {
         const absUrl = toAbsoluteUrl(bestUrl, baseUrl);
-        if (absUrl && (absUrl.startsWith('http://') || absUrl.startsWith('https://'))) {
+        if (
+          absUrl &&
+          (absUrl.startsWith('http://') || absUrl.startsWith('https://')) &&
+          !isLikelyLogoOrIcon(fullTag, absUrl)
+        ) {
           // Skip images Pattern 1 already captured under a card's single name —
           // otherwise a second <img alt="X 2"> in the same card spawns a bogus
           // extra "character" for what is really just another photo of X.

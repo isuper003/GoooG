@@ -1,6 +1,56 @@
 import { describe, it, expect } from 'vitest';
 import { parseHtmlContent, upgradeImageResolution } from './crawler';
 
+describe('parseHtmlContent — logo/icon filtering', () => {
+  const baseUrl = 'https://example.com/gallery';
+
+  it('does not extract the site logo (svg, wrapped in a home link) as a character', () => {
+    const html = `
+      <header>
+        <a href="/">
+          <img src="https://static.example.com/style/img/logo.svg" alt=" Free Porn Pics" width="118" height="56">
+        </a>
+      </header>
+      <a href="/profile/real"><img src="https://cdn.test/real-1.jpg" alt="Real Person"></a>
+      <a href="/profile/real2"><img src="https://cdn.test/real-2.jpg" alt="Another Person"></a>
+    `;
+    const items = parseHtmlContent(html, baseUrl, 'sluts');
+    expect(items.map((i) => i.name)).not.toContain('Free Porn Pics');
+    expect(items.map((i) => i.name).sort()).toEqual(['Another Person', 'Real Person']);
+  });
+
+  it('does not extract a "Login with Google" icon as a character', () => {
+    const html = `
+      <a href="#" class="google-oauth-button">
+        <img src="https://static.example.com/style/img/google-icon.svg" alt="google" width="22" height="22">
+        <span>Login with Google</span>
+      </a>
+      <a href="/profile/real"><img src="https://cdn.test/real-1.jpg" alt="Real Person"></a>
+      <a href="/profile/real2"><img src="https://cdn.test/real-2.jpg" alt="Another Person"></a>
+    `;
+    const items = parseHtmlContent(html, baseUrl, 'sluts');
+    expect(items.map((i) => i.name)).not.toContain('google');
+  });
+
+  it('filters a small non-svg icon purely by its declared width/height', () => {
+    const html = `
+      <a href="/profile/icon"><img src="https://cdn.test/icon.png" alt="Site Icon" width="40" height="40"></a>
+      <a href="/profile/real"><img src="https://cdn.test/real-1.jpg" alt="Real Person"></a>
+      <a href="/profile/real2"><img src="https://cdn.test/real-2.jpg" alt="Another Person"></a>
+    `;
+    const items = parseHtmlContent(html, baseUrl, 'sluts');
+    expect(items.map((i) => i.name)).not.toContain('Site Icon');
+  });
+
+  it('still extracts a real photo that happens to declare large explicit dimensions', () => {
+    const html = `
+      <a href="/profile/real"><img src="https://cdn.test/real-1.jpg" alt="Real Person" width="600" height="800"></a>
+    `;
+    const items = parseHtmlContent(html, baseUrl, 'sluts');
+    expect(items.map((i) => i.name)).toContain('Real Person');
+  });
+});
+
 describe('upgradeImageResolution', () => {
   it('replaces a /460/ path segment with /1280/', () => {
     expect(upgradeImageResolution('https://cdni.pornpics.com/460/7/549/43129135/43129135_073.jpg')).toBe(
