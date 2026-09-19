@@ -21,13 +21,13 @@ export default function RemediationScreen({
 }: RemediationScreenProps) {
   return (
     <div className="w-full flex flex-col items-center gap-8">
-      <div className="w-full max-w-3xl flex items-center justify-between">
-        <div className="flex flex-col gap-1">
-          <span className="font-mono text-xs uppercase tracking-wider text-accent font-semibold">
-            Practice round
+      <div className="w-full max-w-4xl flex items-center justify-between pb-4 border-b border-white/[0.08]">
+        <div className="flex flex-col gap-0.5">
+          <span className="font-mono text-xs uppercase tracking-wider text-cyan-400 font-bold">
+            Remediation Protocol &mdash; Practice
           </span>
           {progress ? (
-            <span className="text-sm text-fg-muted">
+            <span className="text-xs font-mono text-white/60">
               {progress.masteredCount} of {progress.totalCount} mastered
             </span>
           ) : null}
@@ -35,9 +35,9 @@ export default function RemediationScreen({
         <button
           type="button"
           onClick={onFinishEarly}
-          className="text-sm font-medium text-fg-muted hover:text-fg transition-colors"
+          className="text-xs font-mono text-white/40 hover:text-white transition-colors cursor-pointer"
         >
-          Finish anyway
+          Finish Drill →
         </button>
       </div>
 

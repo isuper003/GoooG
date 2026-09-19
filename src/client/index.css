@@ -1,44 +1,55 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   Design concept: "Case File" — a dossier/evidence-board look for a
-   character-identification game. Cards read like index cards with a folded
-   corner, stats read like a ledger, category tags read like folder-tab
-   labels, and a correct/wrong answer lands like a rubber stamp.
+   Design: Obsidian Studio — A bespoke, high-precision visual recognition
+   environment. Razor-sharp typography, hairline edge-lighting, and ambient
+   backlit character stages.
    --------------------------------------------------------------------------- */
 
 @theme {
-  --color-bg: #16130f;
-  --color-bg-card: #1f1a14;
-  --color-bg-nav: #120f0b;
-  --color-bg-muted: #2a231b;
-  --color-bg-hover: #3a3025;
+  --color-bg: #04060a;
+  --color-bg-base: #04060a;
+  --color-bg-surface: #090d14;
+  --color-bg-card: #0f141f;
+  --color-bg-nav: #04060a;
+  --color-bg-muted: #141b27;
+  --color-bg-hover: #182232;
 
-  --color-fg: #f1ead9;
-  --color-fg-muted: #b3a48c;
-  --color-fg-dim: #7a6d59;
+  --color-fg: #f5f7fb;
+  --color-fg-muted: #8490a2;
+  --color-fg-dim: #4d586a;
 
-  /* Primary accent — brass ink-stamp color. Used app-wide for the one
-     recurring highlight (was previously borrowed ad hoc from the "trans"
-     category color, which had nothing to do with being a primary action). */
-  --color-accent: #c98a3a;
+  --color-accent: #00f0ff;
+  --color-accent-cyan: #00f0ff;
+  --color-accent-gold: #f5b942;
+  --color-accent-rose: #ff4766;
+  --color-accent-emerald: #00e599;
 
-  /* Folder-tab colors per category — dusty, distinguishable, not a
-     stoplight palette. */
-  --color-category-trans: #6b8f9e;
-  --color-category-sluts: #b6486b;
-  --color-category-sl: #b6486b;
-  --color-category-twinks: #7a9b5c;
+  --color-category-trans: #3b82f6;
+  --color-category-sluts: #ec4899;
+  --color-category-sl: #ec4899;
+  --color-category-twinks: #10b981;
 
-  --radius-card: 0.25rem;
-  --radius-button: 0.25rem;
-  --radius-badge: 0.1875rem;
+  --radius-card: 1rem;
+  --radius-button: 0.75rem;
+  --radius-badge: 0.5rem;
 
-  --spacing-nav: 4.5rem;
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'Fira Code', ui-monospace, monospace;
+}
 
-  --font-display: 'Fraunces', ui-serif, Georgia, serif;
-  --font-sans: 'Work Sans', system-ui, -apple-system, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+:root {
+  --bg-base: #04060a;
+  --bg-surface: #090d14;
+  --bg-card: #0f141f;
+  --bg-card-hover: #161e2e;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --accent-cyan: #00f0ff;
+  --accent-gold: #f5b942;
+  --accent-rose: #ff4766;
+  --accent-emerald: #00e599;
 }
 
 body {
@@ -46,56 +57,55 @@ body {
   background-color: var(--color-bg);
   color: var(--color-fg);
   font-family: var(--font-sans);
+  overflow-x: hidden;
 }
 
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+/* Hairline lighting & borders */
+.hairline-card {
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-surface);
+  box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
 }
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+.hairline-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 12px 40px -4px rgba(0, 0, 0, 0.8), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
 }
 
-/* Index-card silhouette: a clipped top-right corner with a small drop-shadow
-   triangle standing in for a folded paper flap. Used on photo cards instead
-   of the generic uniformly-rounded-rectangle-with-shadow default. */
-.card-notch {
+/* Cinematic character ambient glow */
+.character-glow {
   position: relative;
-  clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%);
 }
-.card-notch::after {
+.character-glow::before {
   content: '';
   position: absolute;
-  top: 0;
-  right: 0;
-  width: 22px;
-  height: 22px;
-  background: linear-gradient(135deg, transparent 50%, rgba(0, 0, 0, 0.4) 50%);
+  inset: -15px;
+  background: radial-gradient(circle at 50% 40%, rgba(0, 240, 255, 0.16), rgba(245, 185, 66, 0.08) 50%, transparent 80%);
+  z-index: 0;
+  filter: blur(28px);
   pointer-events: none;
+  opacity: 0.85;
+  transition: opacity 0.5s ease;
 }
 
-/* The one deliberate motion moment: a correct/wrong verdict lands like a
-   rubber stamp hitting paper, instead of a generic fade transition. */
-@keyframes stamp-in {
-  0% {
-    transform: scale(2.4) rotate(-16deg);
-    opacity: 0;
-  }
-  55% {
-    transform: scale(0.9) rotate(-3deg);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1) rotate(-4deg);
-    opacity: 1;
-  }
+/* Key button mechanical press */
+.key-btn {
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 0 0 rgba(255, 255, 255, 0.06), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
 }
-.stamp {
-  animation: stamp-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+.key-btn:hover {
+  background-color: var(--bg-card-hover);
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+}
+.key-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 0 0 0 transparent;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .stamp {
-    animation: none;
-  }
-}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+.custom-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); }
+.custom-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 999px; }
+

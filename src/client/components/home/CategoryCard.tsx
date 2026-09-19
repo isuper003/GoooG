@@ -3,60 +3,77 @@ import { motion } from 'motion/react';
 interface CategoryCardProps {
   title: string;
   tag: string;
-  images: string[];
-  accentClassName: string;
-  borderClassName: string;
+  image?: string;
+  count: number;
+  badgeClass?: string;
   onClick: () => void;
 }
 
 export default function CategoryCard({
   title,
-  tag,
-  images,
-  accentClassName,
-  borderClassName,
+  image,
+  count,
+  badgeClass,
   onClick,
 }: CategoryCardProps) {
-  const previewImages = images.slice(0, 4);
-
   return (
     <motion.button
       type="button"
       onClick={onClick}
       whileTap={{ scale: 0.98 }}
-      className={`card-notch group relative aspect-[3/4] w-full overflow-hidden border-2 border-transparent bg-bg-card text-left transition-colors duration-150 ${borderClassName}`}
+      className="hairline-card rounded-2xl overflow-hidden group cursor-pointer relative transition-all text-left w-full border border-white/10 hover:border-cyan-400 shadow-xl aspect-[9/16] flex flex-col justify-between"
     >
-      {previewImages.length > 0 ? (
-        <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-0.5">
-          {previewImages.map((url, i) => (
-            <div key={i} className="overflow-hidden bg-bg-muted">
-              <img
-                src={url}
-                alt=""
-                referrerPolicy="no-referrer"
-                className="h-full w-full object-cover"
-              />
-            </div>
-          ))}
-          {Array.from({ length: Math.max(0, 4 - previewImages.length) }).map((_, i) => (
-            <div key={`empty-${i}`} className="bg-bg-muted" />
-          ))}
-        </div>
-      ) : (
-        <div className="flex h-full w-full items-center justify-center text-fg-dim text-sm">
-          No characters yet
-        </div>
-      )}
+      {/* Full 9:16 Portrait Image */}
+      <div className="absolute inset-0 bg-black">
+        {image ? (
+          <img
+            src={image}
+            alt={title}
+            referrerPolicy="no-referrer"
+            className="w-full h-full object-cover object-top scale-100 group-hover:scale-105 transition-transform duration-700 filter brightness-[0.88] contrast-[1.05]"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.opacity = '0.3';
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center font-mono text-xs text-white/30">
+            No portrait
+          </div>
+        )}
 
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-
-      <div className={`absolute top-0 left-0 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-white ${accentClassName}`}>
-        {tag}
+        {/* Translucent Ambient Overlays */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/20 to-black/60 pointer-events-none" />
       </div>
 
-      <div className="absolute inset-x-0 bottom-0 px-3 py-2.5">
-        <div className="font-display text-lg sm:text-xl font-semibold text-white">{title}</div>
+      {/* Top Meta Floating Row */}
+      <div className="relative z-10 p-3.5 flex items-center justify-between w-full">
+        <span
+          className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider border backdrop-blur-md ${
+            badgeClass || 'bg-white/10 text-white/80 border-white/20'
+          }`}
+        >
+          {title}
+        </span>
+        <span className="text-[10px] font-mono text-white/75 bg-black/50 px-2 py-0.5 rounded-full border border-white/10 backdrop-blur-md">
+          {count} Cards
+        </span>
+      </div>
+
+      {/* Bottom Title & Action Floating Row */}
+      <div className="relative z-10 p-3.5 mt-auto flex flex-col gap-1 w-full pointer-events-none">
+        <div className="flex items-center gap-1.5 text-cyan-400 font-mono text-[10px] uppercase tracking-wider">
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+          <span>Category Deck</span>
+        </div>
+        <h3 className="font-display font-black text-white text-xl sm:text-2xl drop-shadow-md truncate">
+          {title}
+        </h3>
+        <div className="flex items-center justify-between pt-2 border-t border-white/10 text-xs font-mono text-cyan-300 group-hover:text-white transition-colors">
+          <span>Start Deck</span>
+          <span className="group-hover:translate-x-1 transition-transform">→</span>
+        </div>
       </div>
     </motion.button>
   );
 }
+

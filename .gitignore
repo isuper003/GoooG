@@ -6,3 +6,8 @@ dist
 *.local
 *.tsbuildinfo
 .claude
+preview_prototype.html
+preview_classic.html
+preview_modern.html
+preview_deck.html
+mockups/

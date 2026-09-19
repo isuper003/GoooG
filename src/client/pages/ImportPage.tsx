@@ -76,23 +76,28 @@ export default function ImportPage() {
   return (
     <div className="space-y-6">
       {/* Header & Modes */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/[0.08] pb-5">
         <div>
-          <h1 className="font-display text-3xl font-semibold text-fg">Character Importer</h1>
-          <p className="text-fg-muted mt-1 text-sm">
-            Crawl target category pages, look characters up by name, or add a single character manually.
+          <span className="text-[11px] font-mono text-cyan-400 uppercase tracking-widest font-semibold">
+            Curation Studio
+          </span>
+          <h1 className="text-3xl sm:text-4xl font-display font-black text-white tracking-tight mt-0.5">
+            Photo Studio &amp; Importer
+          </h1>
+          <p className="text-white/50 mt-1 text-xs">
+            Ingest candidates via high-speed web crawler, query by name, or manually curate facial flashcards.
           </p>
         </div>
 
         {/* Mode Buttons */}
-        <div className="flex items-center rounded-button bg-bg-card border border-bg-hover p-1">
+        <div className="flex items-center rounded-xl bg-white/[0.04] border border-white/10 p-1">
           <button
             type="button"
             onClick={() => setImportMode('crawler')}
-            className={`rounded-button px-3.5 py-1.5 text-xs font-semibold transition-all ${
+            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
               importMode === 'crawler'
-                ? 'bg-accent text-white shadow-sm'
-                : 'text-fg-muted hover:text-fg'
+                ? 'bg-white text-black shadow-sm'
+                : 'text-white/50 hover:text-white'
             }`}
           >
             🌐 Web Crawler
@@ -100,10 +105,10 @@ export default function ImportPage() {
           <button
             type="button"
             onClick={() => setImportMode('byName')}
-            className={`rounded-button px-3.5 py-1.5 text-xs font-semibold transition-all ${
+            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
               importMode === 'byName'
-                ? 'bg-accent text-white shadow-sm'
-                : 'text-fg-muted hover:text-fg'
+                ? 'bg-white text-black shadow-sm'
+                : 'text-white/50 hover:text-white'
             }`}
           >
             🔎 By Name
@@ -111,13 +116,13 @@ export default function ImportPage() {
           <button
             type="button"
             onClick={() => setImportMode('manual')}
-            className={`rounded-button px-3.5 py-1.5 text-xs font-semibold transition-all ${
+            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
               importMode === 'manual'
-                ? 'bg-accent text-white shadow-sm'
-                : 'text-fg-muted hover:text-fg'
+                ? 'bg-white text-black shadow-sm'
+                : 'text-white/50 hover:text-white'
             }`}
           >
-            ✍ Single Manual Add
+            ✍ Manual Add
           </button>
         </div>
       </div>
@@ -130,64 +135,69 @@ export default function ImportPage() {
 
       {/* MODE 3: Single Manual Form */}
       {importMode === 'manual' ? (
-        <div className="max-w-xl rounded-card border border-bg-hover bg-bg-card p-6 flex flex-col gap-5 shadow-sm">
-          <h2 className="font-display text-xl font-semibold text-fg">
-            Add a character manually
-          </h2>
+        <div className="max-w-xl hairline-card rounded-3xl border border-white/10 bg-[#090d14] p-6 sm:p-8 flex flex-col gap-5 shadow-2xl">
+          <div>
+            <span className="font-mono text-[10px] uppercase tracking-wider text-cyan-400 font-bold">
+              Manual Ingestion Protocol
+            </span>
+            <h2 className="font-display text-2xl font-bold text-white mt-0.5">
+              Add Character File
+            </h2>
+          </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-fg-dim">
+            <label className="text-xs font-mono uppercase tracking-wider text-white/50">
               Character Name
             </label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Character Name"
-              className="rounded-button border border-bg-hover bg-bg-muted px-3 py-2 text-sm text-fg focus:border-accent focus:outline-none"
+              placeholder="e.g. Performer Name"
+              className="rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-sm text-white placeholder-white/30 focus:border-cyan-400 focus:outline-none transition-colors"
             />
             {duplicateWarning ? (
-              <span className="text-xs text-amber-400">{duplicateWarning}</span>
+              <span className="text-xs text-amber-400 font-mono">{duplicateWarning}</span>
             ) : null}
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-fg-dim">
+            <label className="text-xs font-mono uppercase tracking-wider text-white/50">
               Category
             </label>
             <select
               value={categoryKey}
               onChange={(e) => setCategoryKey(e.target.value as 'trans' | 'sluts' | 'twinks')}
-              className="rounded-button border border-bg-hover bg-bg-muted px-3 py-2 text-sm font-medium text-fg focus:border-accent focus:outline-none"
+              className="rounded-xl border border-white/10 bg-[#090d14] px-3.5 py-2.5 text-sm font-medium text-white focus:border-cyan-400 focus:outline-none transition-colors"
             >
               {CATEGORY_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
-                  {opt.label}
+                  {opt.label} Deck
                 </option>
               ))}
             </select>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-fg-dim">
+            <label className="text-xs font-mono uppercase tracking-wider text-white/50">
               Labels
             </label>
             <LabelMultiSelect compact selectedIds={labelIds} onChange={setLabelIds} />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-fg-dim">
+            <label className="text-xs font-mono uppercase tracking-wider text-white/50">
               Images (1&ndash;6 URLs)
             </label>
             <ImageUrlListEditor value={images} onChange={setImages} />
           </div>
 
           {manualError ? (
-            <div className="rounded-button bg-rose-500/10 border border-rose-500/30 px-3 py-2 text-sm text-rose-300">
+            <div className="rounded-xl bg-rose-500/10 border border-rose-500/30 px-3.5 py-2 text-xs text-rose-300 font-mono">
               {manualError}
             </div>
           ) : null}
           {manualSuccess ? (
-            <div className="rounded-button bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-sm text-emerald-300">
+            <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-2 text-xs text-emerald-300 font-mono">
               {manualSuccess}
             </div>
           ) : null}
@@ -196,9 +206,9 @@ export default function ImportPage() {
             type="button"
             onClick={handleManualSubmit}
             disabled={createCharacter.isPending}
-            className="rounded-button bg-accent px-4 py-2.5 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="w-full py-3 rounded-xl bg-cyan-400 hover:bg-white text-black font-semibold text-xs transition-colors shadow-lg shadow-cyan-400/20 disabled:opacity-50 cursor-pointer mt-2"
           >
-            {createCharacter.isPending ? 'Adding...' : 'Add character'}
+            {createCharacter.isPending ? 'Saving Character...' : 'Save to Gallery →'}
           </button>
         </div>
       ) : null}

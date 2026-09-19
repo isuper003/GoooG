@@ -9,53 +9,52 @@ export default function SessionCompleteScreen({ summary }: SessionCompleteScreen
   const accuracyPct = Math.round(summary.accuracy * 100);
 
   return (
-    <div className="w-full max-w-md mx-auto flex flex-col items-center gap-6 text-center">
+    <div className="w-full max-w-md mx-auto flex flex-col items-center gap-6 text-center py-6">
       <div>
-        <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-accent">
-          Case closed
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400">
+          Investigation Completed
         </span>
-        <h2 className="font-display text-3xl font-semibold text-fg mt-1">Session complete</h2>
+        <h2 className="font-display text-3xl font-bold text-white mt-1">Session Debrief</h2>
       </div>
 
       <div className="grid grid-cols-2 gap-3 w-full">
-        <div className="bg-bg-card border-2 border-bg-hover p-4">
-          <div className="font-mono text-3xl font-semibold text-fg">{summary.totalRoundsPlayed}</div>
-          <div className="text-xs text-fg-muted mt-1">Rounds played</div>
+        <div className="hairline-card rounded-2xl p-4 border border-white/10">
+          <div className="font-mono text-3xl font-bold text-white">{summary.totalRoundsPlayed}</div>
+          <div className="text-xs font-mono text-white/50 mt-1">Rounds Cleared</div>
         </div>
-        <div className="bg-bg-card border-2 border-bg-hover p-4">
-          <div className="font-mono text-3xl font-semibold text-fg">{accuracyPct}%</div>
-          <div className="text-xs text-fg-muted mt-1">Accuracy</div>
+        <div className="hairline-card rounded-2xl p-4 border border-white/10">
+          <div className="font-mono text-3xl font-bold text-cyan-400">{accuracyPct}%</div>
+          <div className="text-xs font-mono text-white/50 mt-1">Retention Rate</div>
         </div>
-        <div className="bg-bg-card border-2 border-bg-hover p-4">
-          <div className="font-mono text-3xl font-semibold text-emerald-400">{summary.totalCorrect}</div>
-          <div className="text-xs text-fg-muted mt-1">Correct</div>
+        <div className="hairline-card rounded-2xl p-4 border border-white/10">
+          <div className="font-mono text-3xl font-bold text-emerald-400">{summary.totalCorrect}</div>
+          <div className="text-xs font-mono text-white/50 mt-1">Recognized</div>
         </div>
-        <div className="bg-bg-card border-2 border-bg-hover p-4">
-          <div className="font-mono text-3xl font-semibold text-rose-400">{summary.totalWrong}</div>
-          <div className="text-xs text-fg-muted mt-1">Wrong</div>
+        <div className="hairline-card rounded-2xl p-4 border border-white/10">
+          <div className="font-mono text-3xl font-bold text-rose-400">{summary.totalWrong}</div>
+          <div className="text-xs font-mono text-white/50 mt-1">Missed</div>
         </div>
       </div>
 
       {summary.remediationRoundsPlayed > 0 ? (
-        <p className="text-sm text-fg-muted">
-          Plus {summary.remediationRoundsPlayed} practice{' '}
-          {summary.remediationRoundsPlayed === 1 ? 'round' : 'rounds'} to master missed
-          characters.
+        <p className="text-xs font-mono text-white/60">
+          Completed {summary.remediationRoundsPlayed} remediation{' '}
+          {summary.remediationRoundsPlayed === 1 ? 'drill' : 'drills'} to reinforce missed performers.
         </p>
       ) : null}
 
-      <div className="flex gap-3 w-full">
+      <div className="flex gap-3 w-full pt-2">
         <Link
           to="/"
-          className="flex-1 rounded-button bg-accent px-4 py-3 font-semibold text-white text-center transition-opacity hover:opacity-90"
+          className="flex-1 py-3 px-4 rounded-xl bg-cyan-400 hover:bg-white text-black font-semibold text-xs tracking-wide transition-all shadow-xl shadow-cyan-400/20 text-center"
         >
-          Home
+          Spotlight Home →
         </Link>
         <Link
           to="/gallery"
-          className="flex-1 rounded-button bg-bg-muted px-4 py-3 font-medium text-fg text-center transition-colors hover:bg-bg-hover"
+          className="flex-1 py-3 px-4 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-white/70 hover:text-white font-mono text-xs border border-white/10 transition-colors text-center"
         >
-          Gallery
+          Character Gallery
         </Link>
       </div>
     </div>

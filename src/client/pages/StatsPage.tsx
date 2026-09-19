@@ -15,27 +15,33 @@ export default function StatsPage() {
   const isLoading = overviewLoading || charactersLoading;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-3xl sm:text-4xl font-semibold text-fg">
-          Statistics
+    <div className="flex flex-col gap-6 w-full pb-10">
+      <div className="border-b border-white/[0.08] pb-5">
+        <span className="text-[11px] font-mono text-cyan-400 uppercase tracking-widest font-semibold">
+          Analytics &amp; Performance
+        </span>
+        <h1 className="text-3xl sm:text-4xl font-display font-black text-white tracking-tight mt-0.5">
+          Recognition &amp; Retention Stats
         </h1>
-        <p className="text-fg-muted mt-1 text-sm">
-          Recognition accuracy ledger, category proficiency, and SRS retention levels.
+        <p className="text-white/50 mt-1 text-xs">
+          Cross-category accuracy telemetry, SRS spaced-repetition distribution, and performer retention ranks.
         </p>
       </div>
 
       {isLoading || !overview ? (
-        <p className="text-sm text-fg-muted">Loading...</p>
+        <div className="flex items-center justify-center py-24 text-cyan-400 font-mono text-xs">
+          Loading analytics telemetry...
+        </div>
       ) : overview.gamesPlayed === 0 && characters.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-16 text-center">
-          <p className="text-fg-muted">Play a game to see your stats here.</p>
+        <div className="flex flex-col items-center gap-3 py-20 text-center hairline-card rounded-3xl p-8 border border-white/10">
+          <p className="font-display text-xl text-white">No telemetry recorded yet</p>
+          <p className="text-xs text-white/50">Engage in an Arena session to populate your retention metrics.</p>
         </div>
       ) : (
         <>
-          <OverviewCards stats={overview} />
+          <OverviewCards stats={overview} characters={characters} />
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <CategoryAccuracyChart byCategory={overview.byCategory} />
             <SrsDistributionChart characters={characters} />
           </div>
