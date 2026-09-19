@@ -16,10 +16,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#04060a] text-[#f5f7fb] flex flex-col font-sans selection:bg-cyan-500 selection:text-black">
       {/* Top Minimalist Studio Bar */}
-      <header
-        className="fixed top-0 left-0 right-0 w-full z-40 border-b border-white/[0.08] bg-[#04060a]/95 backdrop-blur-xl"
-        style={{ position: 'fixed', top: 0, left: 0, right: 0, width: '100%', zIndex: 40 }}
-      >
+      <header className="w-full border-b border-white/[0.08] bg-[#04060a]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-6">
           
           {/* Brand & Mode Indicator */}
@@ -75,7 +72,7 @@ export default function App() {
       </header>
 
       {/* Main Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 pt-20 pb-6 flex flex-col">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 flex flex-col">
         <Outlet />
       </main>
     </div>
