@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ApiError } from '../lib/apiClient';
 import { useCreateCharacter } from './useCharacters';
 import type { CrawlerQueueItem } from '../components/import/CrawledCharacterCard';
 
@@ -50,8 +51,14 @@ export function useCrawlerQueue() {
       });
       updateItem(item.id, { status: 'imported', error: undefined });
       return true;
-    } catch {
-      updateItem(item.id, { error: 'Error saving character.', status: 'failed' });
+    } catch (err: unknown) {
+      let message = 'Error saving character.';
+      if (err instanceof ApiError) {
+        message = err.message || `Server error (${err.status})`;
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+      updateItem(item.id, { error: message, status: 'failed' });
       return false;
     }
   }

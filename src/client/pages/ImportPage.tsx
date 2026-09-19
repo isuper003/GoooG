@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { ApiError } from '../lib/apiClient';
 import { useCharacters, useCreateCharacter } from '../hooks/useCharacters';
 import LabelMultiSelect from '../components/shared/LabelMultiSelect';
 import ImageUrlListEditor from '../components/shared/ImageUrlListEditor';
@@ -61,8 +62,14 @@ export default function ImportPage() {
       });
       setManualSuccess(`"${created.name}" was added successfully.`);
       resetManualForm();
-    } catch {
-      setManualError('Could not create this character. Please try again.');
+    } catch (err: unknown) {
+      const msg =
+        err instanceof ApiError
+          ? err.message || `Could not create this character (${err.status}).`
+          : err instanceof Error
+          ? err.message
+          : 'Could not create this character. Please try again.';
+      setManualError(msg);
     }
   }
 

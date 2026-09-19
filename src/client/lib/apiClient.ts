@@ -60,10 +60,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     } catch {
       // response had no JSON body
     }
-    const message =
-      body && typeof body === 'object' && 'error' in body
-        ? String((body as { error: unknown }).error)
-        : res.statusText;
+    let message = res.statusText;
+    if (body && typeof body === 'object') {
+      const b = body as Record<string, unknown>;
+      if (typeof b.error === 'string') {
+        message = b.error;
+      } else if (b.error && typeof b.error === 'object' && 'message' in (b.error as object)) {
+        message = String((b.error as { message: unknown }).message);
+      } else if (typeof b.message === 'string') {
+        message = b.message;
+      }
+    }
     throw new ApiError(res.status, body, message);
   }
 

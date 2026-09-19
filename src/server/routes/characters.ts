@@ -254,7 +254,17 @@ charactersRouter.post('/', zValidator('json', characterCreateSchema), async (c) 
   const charId = charInsert.id;
   const batchStatements: D1PreparedStatement[] = [];
 
-  body.images.forEach((img, idx) => {
+  const uniqueImages: { url: string }[] = [];
+  const seenUrls = new Set<string>();
+  for (const img of body.images) {
+    const trimmed = img.url.trim();
+    if (!seenUrls.has(trimmed)) {
+      seenUrls.add(trimmed);
+      uniqueImages.push({ url: trimmed });
+    }
+  }
+
+  uniqueImages.forEach((img, idx) => {
     batchStatements.push(
       c.env.DB.prepare('INSERT INTO character_images (character_id, url, position) VALUES (?, ?, ?)')
         .bind(charId, img.url, idx)
@@ -312,7 +322,17 @@ charactersRouter.put('/:id', zValidator('json', characterUpdateSchema), async (c
       .bind(body.name.trim(), category.id, now, id),
   ];
 
-  body.images.forEach((img, idx) => {
+  const uniqueImages: { url: string }[] = [];
+  const seenUrls = new Set<string>();
+  for (const img of body.images) {
+    const trimmed = img.url.trim();
+    if (!seenUrls.has(trimmed)) {
+      seenUrls.add(trimmed);
+      uniqueImages.push({ url: trimmed });
+    }
+  }
+
+  uniqueImages.forEach((img, idx) => {
     batchStatements.push(
       c.env.DB.prepare('INSERT INTO character_images (character_id, url, position) VALUES (?, ?, ?)')
         .bind(id, img.url, idx)
