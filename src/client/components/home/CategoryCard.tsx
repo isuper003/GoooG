@@ -64,17 +64,9 @@ export default function CategoryCard({
 
       {/* Bottom Title & Action Floating Row */}
       <div className="relative z-10 p-3.5 mt-auto flex flex-col gap-1 w-full pointer-events-none">
-        <div className="flex items-center gap-1.5 text-cyan-400 font-mono text-[10px] uppercase tracking-wider">
-          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-          <span>Category Deck</span>
-        </div>
         <h3 className="font-display font-black text-white text-xl sm:text-2xl drop-shadow-md truncate">
           {title}
         </h3>
-        <div className="flex items-center justify-between pt-2 border-t border-white/10 text-xs font-mono text-cyan-300 group-hover:text-white transition-colors">
-          <span>Start Deck</span>
-          <span className="group-hover:translate-x-1 transition-transform">→</span>
-        </div>
       </div>
     </motion.button>
   );
