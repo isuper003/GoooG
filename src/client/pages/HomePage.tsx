@@ -166,16 +166,16 @@ export default function HomePage() {
                   src={imgUrl}
                   alt=""
                   referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover object-top scale-100 group-hover:scale-105 transition-all duration-1000 filter brightness-[0.72] contrast-[1.08]"
+                  className="w-full h-full object-cover object-top scale-100 group-hover:scale-105 transition-all duration-1000 filter brightness-[0.88] contrast-[1.05]"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.opacity = '0.3';
                   }}
                 />
               </div>
             ))}
-            {/* Seamless cinematic overlay on top of the 4 photos */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#04060a] via-[#04060a]/50 to-black/35 pointer-events-none" />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#04060a]/92 via-[#04060a]/40 to-transparent pointer-events-none" />
+            {/* Seamless cinematic overlay on top of the 4 photos (softened shadows) */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#04060a]/80 via-[#04060a]/25 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#04060a]/60 via-[#04060a]/15 to-transparent pointer-events-none" />
           </div>
         ) : (
           <div className="absolute inset-0 z-0 bg-[#090d14] pointer-events-none" />
