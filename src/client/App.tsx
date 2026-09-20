@@ -1,5 +1,8 @@
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Link } from 'react-router-dom';
 import { useCharacters } from './hooks/useCharacters';
+import FullscreenButton from './components/ui/FullscreenButton';
+import RandomShowcaseModal from './components/showcase/RandomShowcaseModal';
 
 const navItems = [
   { to: '/', label: 'Spotlight' },
@@ -12,6 +15,13 @@ const navItems = [
 export default function App() {
   const { data: characters = [] } = useCharacters({});
   const activeCount = characters.filter((c) => c.isActive).length;
+  const [isRandomOpen, setIsRandomOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOpen = () => setIsRandomOpen(true);
+    window.addEventListener('open-random-showcase', handleOpen);
+    return () => window.removeEventListener('open-random-showcase', handleOpen);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#04060a] text-[#f5f7fb] flex flex-col font-sans selection:bg-cyan-500 selection:text-black">
@@ -60,12 +70,24 @@ export default function App() {
               <span>ROSTER: {activeCount || characters.length || 0} ACTIVE</span>
             </div>
 
+            <button
+              type="button"
+              onClick={() => setIsRandomOpen(true)}
+              className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] text-white/80 hover:text-white border border-white/[0.1] hover:border-cyan-400/40 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+              title="Inspect Random Characters"
+            >
+              <span>🎲</span>
+              <span>Random</span>
+            </button>
+
             <Link
               to="/play"
               className="px-3.5 py-1.5 rounded-lg bg-cyan-400 hover:bg-white text-black font-semibold text-xs transition-colors shadow-lg shadow-cyan-400/20"
             >
               Train Now →
             </Link>
+
+            <FullscreenButton variant="header" />
           </div>
 
         </div>
@@ -75,6 +97,12 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 flex flex-col">
         <Outlet />
       </main>
+
+      {/* Floating Random Showcase Overlay */}
+      <RandomShowcaseModal
+        isOpen={isRandomOpen}
+        onClose={() => setIsRandomOpen(false)}
+      />
     </div>
   );
 }

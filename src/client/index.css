@@ -109,3 +109,34 @@ body {
 .custom-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); }
 .custom-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 999px; }
 
+/* ---------------------------------------------------------------------------
+   Universal Fullscreen (Mobile & Laptop) Support
+   --------------------------------------------------------------------------- */
+:root.fullscreen-active {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Pseudo-fullscreen fallback for iOS Safari and browsers without native fullscreen */
+html.pseudo-fullscreen {
+  overflow: hidden !important;
+  height: 100dvh !important;
+  width: 100vw !important;
+}
+
+body.pseudo-fullscreen-body {
+  overflow-y: auto !important;
+  height: 100dvh !important;
+  width: 100vw !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 9999 !important;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+

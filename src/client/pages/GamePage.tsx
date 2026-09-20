@@ -8,6 +8,7 @@ import MatchRound from '../components/game/MatchRound';
 import ResultsScreen from '../components/game/ResultsScreen';
 import RemediationScreen from '../components/game/RemediationScreen';
 import SessionCompleteScreen from '../components/game/SessionCompleteScreen';
+import FullscreenButton from '../components/ui/FullscreenButton';
 
 interface GameLocationState {
   sessionId: number;
@@ -95,36 +96,39 @@ function ActiveGame({ state }: { state: GameLocationState }) {
                 </span>
               </div>
 
-              {confirmingEnd ? (
-                <div className="flex items-center gap-2 text-xs font-mono">
-                  <span className="text-white/60">Abort?</span>
+              <div className="flex items-center gap-3">
+                <FullscreenButton variant="header" />
+                {confirmingEnd ? (
+                  <div className="flex items-center gap-2 text-xs font-mono">
+                    <span className="text-white/60">Abort?</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmingEnd(false);
+                        game.endSessionEarly();
+                      }}
+                      className="font-bold text-rose-400 hover:text-rose-300 underline cursor-pointer"
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingEnd(false)}
+                      className="text-white/40 hover:text-white cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
                   <button
                     type="button"
-                    onClick={() => {
-                      setConfirmingEnd(false);
-                      game.endSessionEarly();
-                    }}
-                    className="font-bold text-rose-400 hover:text-rose-300 underline cursor-pointer"
+                    onClick={() => setConfirmingEnd(true)}
+                    className="text-xs font-mono text-white/40 hover:text-rose-400 transition-colors cursor-pointer"
                   >
-                    Confirm
+                    Abort Session
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmingEnd(false)}
-                    className="text-white/40 hover:text-white cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setConfirmingEnd(true)}
-                  className="text-xs font-mono text-white/40 hover:text-rose-400 transition-colors cursor-pointer"
-                >
-                  Abort Session
-                </button>
-              )}
+                )}
+              </div>
             </div>
 
             {game.currentRound.mode === 'classic' ? (

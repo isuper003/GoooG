@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toProxiedImageUrl } from '../../lib/imageUrl';
+import FullscreenButton from '../ui/FullscreenButton';
 
 interface ImageLightboxProps {
   images: string[];
@@ -31,9 +32,12 @@ export default function ImageLightbox({ images, characterName, onClose }: ImageL
       >
         <div className="flex w-full items-center justify-between">
           <span className="font-semibold text-white">{characterName}</span>
-          <button type="button" onClick={onClose} className="text-sm text-white/70 hover:text-white">
-            Close
-          </button>
+          <div className="flex items-center gap-2">
+            <FullscreenButton variant="header" />
+            <button type="button" onClick={onClose} className="text-sm text-white/70 hover:text-white px-2 py-1 rounded hover:bg-white/10 transition-colors">
+              Close
+            </button>
+          </div>
         </div>
 
         <div className="relative aspect-square w-full overflow-hidden rounded-card bg-bg-muted">
