@@ -28,11 +28,18 @@ export const labelCreateSchema = z.object({
   name: z.string().trim().min(1, 'Label name is required'),
 });
 
-export const gameSessionCreateSchema = z.object({
-  scope: z.enum(['trans', 'sluts', 'twinks', 'mix']),
-  mode: z.enum(['classic', 'match']),
-  plannedRounds: z.number().int().positive().nullable().optional(),
-});
+export const gameSessionCreateSchema = z
+  .object({
+    scope: z.enum(['trans', 'sluts', 'twinks', 'mix']).default('mix'),
+    mode: z.enum(['classic', 'match']),
+    plannedRounds: z.number().int().positive().nullable().optional(),
+    characterIds: z.array(z.number().int().positive()).min(1).max(100).optional(),
+    preset: z.enum(['due', 'leech', 'critical', 'quick_mix']).optional(),
+    padPoolTo: z.number().int().min(2).max(100).optional(),
+  })
+  .refine((v) => !(v.characterIds && v.preset), {
+    message: 'Provide either characterIds or preset, not both',
+  });
 
 export const gameAnswerSchema = z.object({
   phase: z.enum(['main', 'remediation']),
@@ -41,6 +48,10 @@ export const gameAnswerSchema = z.object({
   isCorrect: z.boolean(),
   srsLevelBefore: z.number().int().min(0).max(5),
   srsLevelAfter: z.number().int().min(0).max(5),
+  selectedCharacterId: z.number().int().positive().nullable().optional(),
+  elapsedMs: z.number().int().min(0).nullable().optional(),
+  fluency: z.enum(['lightning', 'fluent', 'hesitant']).nullable().optional(),
+  mode: z.enum(['classic', 'match']).optional(),
 });
 
 export const gameSessionFinishSchema = z.object({

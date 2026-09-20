@@ -1,3 +1,5 @@
+import type { ConfusionEntry, HeatCellState } from './srs';
+
 export interface CategoryDTO {
   id: number;
   key: string;
@@ -37,6 +39,8 @@ export interface GameSessionPoolCharacter {
   srsLevel: number;
   correctCount: number;
   wrongCount: number;
+  isLeech?: boolean;
+  nextReviewAt?: string | null;
 }
 
 export interface CategoryStats {
@@ -56,6 +60,9 @@ export interface StatsOverview {
 export interface GameSessionCreateResponse {
   sessionId: number;
   pool: GameSessionPoolCharacter[];
+  focusIds?: number[] | null;
+  confusion?: Record<number, ConfusionEntry[]>;
+  latencyBaseline?: { classic: number | null; match: number | null };
 }
 
 export interface GameAnswerResponse {
@@ -69,4 +76,37 @@ export interface HomePreviewsDTO {
   sluts: string[];
   twinks: string[];
   mix: string[];
+}
+
+export interface ConfusedPair {
+  targetId: number;
+  targetName: string;
+  selectedId: number;
+  selectedName: string;
+  count: number;
+}
+
+export interface HeatmapCell {
+  id: number;
+  name: string;
+  categoryKey: string;
+  srsLevel: number;
+  state: HeatCellState;
+}
+
+export interface HeatmapResponse {
+  cells: HeatmapCell[];
+  byState: Record<HeatCellState, number>;
+  criticalIds: number[];
+}
+
+export interface ReviewQueue {
+  count: number;
+  characterIds: number[];
+}
+
+export interface ReviewQueuesDTO {
+  due: ReviewQueue;
+  leech: ReviewQueue;
+  quick: ReviewQueue;
 }
