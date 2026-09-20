@@ -3,14 +3,12 @@ import type { CategoryStats } from '../../../shared/types';
 const CATEGORY_LABELS: Record<string, string> = {
   trans: 'Trans',
   sluts: 'Sluts',
-  sl: 'Sluts',
   twinks: 'Twinks',
 };
 
 const CATEGORY_BAR_CLASSES: Record<string, string> = {
   trans: 'bg-cyan-400',
   sluts: 'bg-pink-400',
-  sl: 'bg-pink-400',
   twinks: 'bg-purple-400',
 };
 

@@ -1,14 +1,15 @@
-import type { StatsOverview, CharacterDTO } from '../../../shared/types';
+import type { StatsOverview } from '../../../shared/types';
 
 interface OverviewCardsProps {
   stats: StatsOverview;
-  characters?: CharacterDTO[];
 }
 
-export default function OverviewCards({ stats, characters = [] }: OverviewCardsProps) {
+export default function OverviewCards({ stats }: OverviewCardsProps) {
   const accuracyPct = Math.round(stats.overallAccuracy * 100);
-  const masteredCount = characters.filter((c) => c.srsLevel >= 4).length;
-  const weakCount = characters.filter((c) => c.wrongCount > 0).length;
+  const rosterPct =
+    stats.activeCharacters > 0
+      ? `${Math.round((stats.masteredCharacters / stats.activeCharacters) * 100)}% of Roster`
+      : '0% of Roster';
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -41,12 +42,10 @@ export default function OverviewCards({ stats, characters = [] }: OverviewCardsP
           Mastered Performers (SRS &ge; 4)
         </span>
         <div className="text-3xl sm:text-4xl font-display font-bold text-amber-400 mt-1">
-          {masteredCount}
+          {stats.masteredCharacters}
         </div>
         <span className="text-[11px] font-mono text-amber-300/70 mt-2 block">
-          {characters.length > 0
-            ? `${Math.round((masteredCount / characters.length) * 100)}% of Roster`
-            : '0% of Roster'}
+          {rosterPct}
         </span>
       </div>
 
@@ -55,7 +54,7 @@ export default function OverviewCards({ stats, characters = [] }: OverviewCardsP
           Remediation Flagged
         </span>
         <div className="text-3xl sm:text-4xl font-display font-bold text-rose-400 mt-1">
-          {weakCount}
+          {stats.strugglingCharacters}
         </div>
         <span className="text-[11px] font-mono text-rose-300/70 mt-2 block">
           Needs Reinforcement

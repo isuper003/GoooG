@@ -32,14 +32,14 @@ export default function StatsPage() {
         <div className="flex items-center justify-center py-24 text-cyan-400 font-mono text-xs">
           Loading analytics telemetry...
         </div>
-      ) : overview.gamesPlayed === 0 && characters.length === 0 ? (
+      ) : overview.totalRoundsAnswered === 0 ? (
         <div className="flex flex-col items-center gap-3 py-20 text-center hairline-card rounded-3xl p-8 border border-white/10">
           <p className="font-display text-xl text-white">No telemetry recorded yet</p>
           <p className="text-xs text-white/50">Engage in an Arena session to populate your retention metrics.</p>
         </div>
       ) : (
         <>
-          <OverviewCards stats={overview} characters={characters} />
+          <OverviewCards stats={overview} />
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <CategoryAccuracyChart byCategory={overview.byCategory} />

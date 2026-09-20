@@ -55,6 +55,11 @@ export interface StatsOverview {
   totalRoundsAnswered: number;
   overallAccuracy: number;
   byCategory: CategoryStats[];
+  totalCorrect: number;
+  totalWrong: number;
+  activeCharacters: number;
+  masteredCharacters: number;
+  strugglingCharacters: number;
 }
 
 export interface GameSessionCreateResponse {

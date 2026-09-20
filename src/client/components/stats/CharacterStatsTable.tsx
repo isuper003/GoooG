@@ -5,7 +5,6 @@ import { toProxiedImageUrl } from '../../lib/imageUrl';
 const CATEGORY_CLASSES: Record<string, string> = {
   trans: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
   sluts: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
-  sl: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
   twinks: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
 };
 
@@ -65,7 +64,8 @@ export default function CharacterStatsTable({
             <tbody className="divide-y divide-white/[0.04]">
               {characters.map((c) => {
                 const total = c.correctCount + c.wrongCount;
-                const acc = total > 0 ? ((c.correctCount / total) * 100).toFixed(1) : '100.0';
+                const hasTests = total > 0;
+                const acc = hasTests ? `${((c.correctCount / total) * 100).toFixed(1)}%` : '—';
                 const avatar = c.images[0]?.url;
                 return (
                   <tr key={c.id} className="hover:bg-white/[0.02] transition-colors">
@@ -94,8 +94,12 @@ export default function CharacterStatsTable({
                         {c.categoryKey}
                       </span>
                     </td>
-                    <td className="py-2.5 pr-3 text-center text-cyan-400 font-bold">
-                      {acc}%
+                    <td
+                      className={`py-2.5 pr-3 text-center ${
+                        hasTests ? 'text-cyan-400 font-bold' : 'text-white/30'
+                      }`}
+                    >
+                      {acc}
                     </td>
                     <td className="py-2.5 pr-3 text-right text-emerald-400">+{c.correctCount}</td>
                     <td className="py-2.5 pr-3 text-right text-rose-400">-{c.wrongCount}</td>
