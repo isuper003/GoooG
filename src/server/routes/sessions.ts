@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { queryAll, queryOne } from '../db';
+import { queryAll, queryOne, queryAllChunked } from '../db';
 import {
   gameSessionCreateSchema,
   gameAnswerSchema,
   gameSessionFinishSchema,
 } from '../../shared/validation';
+import type { GameSessionCreateInput } from '../../shared/validation';
 import type {
   GameSessionPoolCharacter,
   GameSessionCreateResponse,
@@ -13,12 +14,18 @@ import type {
 } from '../../shared/types';
 import type { AppEnv } from '../app';
 
+interface IdRow {
+  id: number;
+}
+
 interface CharacterPoolRow {
   id: number;
   name: string;
   srs_level: number;
   correct_count: number;
   wrong_count: number;
+  is_leech: number;
+  next_review_at: string | null;
 }
 
 interface ImageRow {
@@ -30,6 +37,254 @@ interface CharacterStatsRow {
   correct_count: number;
   wrong_count: number;
   srs_level: number;
+}
+
+async function resolvePoolIds(
+  db: D1Database,
+  body: GameSessionCreateInput,
+  nowIso: string
+): Promise<{ focusIds: number[] | null; candidateIds: number[] }> {
+  if (body.characterIds) {
+    const rows = await queryAllChunked<IdRow>(
+      db,
+      (placeholders) =>
+        `SELECT c.id FROM characters c
+         WHERE c.id IN (${placeholders}) AND c.is_active = 1
+           AND EXISTS (SELECT 1 FROM character_images ci WHERE ci.character_id = c.id)`,
+      body.characterIds
+    );
+
+    const survivingSet = new Set(rows.map((r) => r.id));
+    const orderedIds: number[] = [];
+    const seen = new Set<number>();
+    for (const id of body.characterIds) {
+      if (survivingSet.has(id) && !seen.has(id)) {
+        seen.add(id);
+        orderedIds.push(id);
+      }
+    }
+
+    return {
+      focusIds: orderedIds,
+      candidateIds: [...orderedIds],
+    };
+  }
+
+  if (body.preset) {
+    let focusIds: number[];
+    switch (body.preset) {
+      case 'due': {
+        const rows = await queryAll<IdRow>(
+          db,
+          `SELECT c.id FROM characters c
+           WHERE c.is_active = 1
+             AND EXISTS (SELECT 1 FROM character_images ci WHERE ci.character_id = c.id)
+             AND c.next_review_at IS NOT NULL AND c.next_review_at <= ?
+           ORDER BY c.next_review_at ASC LIMIT 50`,
+          nowIso
+        );
+        focusIds = rows.map((r) => r.id);
+        break;
+      }
+      case 'leech': {
+        const rows = await queryAll<IdRow>(
+          db,
+          `SELECT c.id FROM characters c
+           WHERE c.is_active = 1
+             AND EXISTS (SELECT 1 FROM character_images ci WHERE ci.character_id = c.id)
+             AND c.is_leech = 1
+           ORDER BY c.wrong_count DESC, c.id ASC LIMIT 8`
+        );
+        focusIds = rows.map((r) => r.id);
+        break;
+      }
+      case 'critical': {
+        const rows = await queryAll<IdRow>(
+          db,
+          `SELECT c.id FROM characters c
+           WHERE c.is_active = 1
+             AND EXISTS (SELECT 1 FROM character_images ci WHERE ci.character_id = c.id)
+             AND (c.is_leech = 1 OR (c.next_review_at IS NOT NULL AND c.next_review_at <= ?))
+           ORDER BY c.is_leech DESC, c.next_review_at ASC, c.id ASC LIMIT 50`,
+          nowIso
+        );
+        focusIds = rows.map((r) => r.id);
+        break;
+      }
+      case 'quick_mix': {
+        const [missedRows, neverTestedRows, masteredRows] = await Promise.all([
+          queryAll<IdRow>(
+            db,
+            `SELECT c.id FROM characters c
+             WHERE c.is_active = 1
+               AND EXISTS (SELECT 1 FROM character_images ci WHERE ci.character_id = c.id)
+               AND EXISTS (SELECT 1 FROM game_answers a WHERE a.character_id = c.id AND a.is_correct = 0)
+             ORDER BY (SELECT MAX(a.answered_at) FROM game_answers a
+                       WHERE a.character_id = c.id AND a.is_correct = 0) DESC
+             LIMIT 5`
+          ),
+          queryAll<IdRow>(
+            db,
+            `SELECT c.id FROM characters c
+             WHERE c.is_active = 1
+               AND EXISTS (SELECT 1 FROM character_images ci WHERE ci.character_id = c.id)
+               AND c.correct_count = 0 AND c.wrong_count = 0
+             ORDER BY c.created_at DESC, c.id DESC
+             LIMIT 3`
+          ),
+          queryAll<IdRow>(
+            db,
+            `SELECT c.id FROM characters c
+             WHERE c.is_active = 1
+               AND EXISTS (SELECT 1 FROM character_images ci WHERE ci.character_id = c.id)
+               AND c.srs_level = 5
+             ORDER BY RANDOM()
+             LIMIT 2`
+          ),
+        ]);
+
+        const seen = new Set<number>();
+        focusIds = [];
+        for (const row of [...missedRows, ...neverTestedRows, ...masteredRows]) {
+          if (!seen.has(row.id)) {
+            seen.add(row.id);
+            focusIds.push(row.id);
+          }
+        }
+        break;
+      }
+      default: {
+        const _exhaustive: never = body.preset;
+        throw new Error(`Unhandled preset: ${_exhaustive}`);
+      }
+    }
+
+    return {
+      focusIds,
+      candidateIds: [...focusIds],
+    };
+  }
+
+  // Branch A — neither characterIds nor preset (the existing path)
+  const isMix = body.scope === 'mix';
+  const query = isMix
+    ? `SELECT c.id
+       FROM characters c
+       WHERE c.is_active = 1
+         AND EXISTS (SELECT 1 FROM character_images ci WHERE ci.character_id = c.id)
+       ORDER BY c.id ASC`
+    : `SELECT c.id
+       FROM characters c
+       JOIN categories cat ON c.category_id = cat.id
+       WHERE cat.key = ?
+         AND c.is_active = 1
+         AND EXISTS (SELECT 1 FROM character_images ci WHERE ci.character_id = c.id)
+       ORDER BY c.id ASC`;
+
+  const rows = isMix
+    ? await queryAll<IdRow>(db, query)
+    : await queryAll<IdRow>(db, query, body.scope);
+
+  return {
+    focusIds: null,
+    candidateIds: rows.map((r) => r.id),
+  };
+}
+
+async function padCandidateIds(
+  db: D1Database,
+  candidateIds: number[],
+  focusIds: number[],
+  padPoolTo?: number
+): Promise<number[]> {
+  const padTarget = Math.min(100, padPoolTo ?? Math.max(10, focusIds.length * 2));
+  if (candidateIds.length >= padTarget) {
+    return candidateIds;
+  }
+
+  const limit = padTarget + focusIds.length;
+  const fillerRows = await queryAll<IdRow>(
+    db,
+    `SELECT c.id FROM characters c
+     WHERE c.is_active = 1
+       AND EXISTS (SELECT 1 FROM character_images ci WHERE ci.character_id = c.id)
+     ORDER BY c.srs_level ASC, c.wrong_count DESC, c.id ASC
+     LIMIT ?`,
+    limit
+  );
+
+  const existingIds = new Set(candidateIds);
+  const padded = [...candidateIds];
+  for (const row of fillerRows) {
+    if (!existingIds.has(row.id)) {
+      existingIds.add(row.id);
+      padded.push(row.id);
+      if (padded.length === padTarget) {
+        break;
+      }
+    }
+  }
+
+  return padded;
+}
+
+async function hydratePool(
+  db: D1Database,
+  ids: readonly number[]
+): Promise<GameSessionPoolCharacter[]> {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const [characters, imageRows] = await Promise.all([
+    queryAllChunked<CharacterPoolRow>(
+      db,
+      (placeholders) =>
+        `SELECT c.id, c.name, c.srs_level, c.correct_count, c.wrong_count, c.is_leech, c.next_review_at
+         FROM characters c
+         WHERE c.id IN (${placeholders})`,
+      ids
+    ),
+    queryAllChunked<ImageRow>(
+      db,
+      (placeholders) =>
+        `SELECT character_id, url
+         FROM character_images
+         WHERE character_id IN (${placeholders})
+         ORDER BY position ASC, id ASC`,
+      ids
+    ),
+  ]);
+
+  const imagesMap = new Map<number, string[]>();
+  for (const img of imageRows) {
+    const list = imagesMap.get(img.character_id) ?? [];
+    list.push(img.url);
+    imagesMap.set(img.character_id, list);
+  }
+
+  const charMap = new Map<number, CharacterPoolRow>();
+  for (const char of characters) {
+    charMap.set(char.id, char);
+  }
+
+  const pool: GameSessionPoolCharacter[] = [];
+  for (const id of ids) {
+    const char = charMap.get(id);
+    if (!char) continue;
+    pool.push({
+      id: char.id,
+      name: char.name,
+      images: imagesMap.get(char.id) ?? [],
+      srsLevel: char.srs_level,
+      correctCount: char.correct_count,
+      wrongCount: char.wrong_count,
+      isLeech: Boolean(char.is_leech),
+      nextReviewAt: char.next_review_at ?? null,
+    });
+  }
+
+  return pool;
 }
 
 export const sessionsRouter = new Hono<AppEnv>();
@@ -46,67 +301,49 @@ sessionsRouter.post('/', zValidator('json', gameSessionCreateSchema), async (c) 
     .bind(oneHourAgo)
     .run();
 
-  // Query eligible characters with at least 1 image
-  const isMix = body.scope === 'mix';
-  const query = isMix
-    ? `SELECT c.id, c.name, c.srs_level, c.correct_count, c.wrong_count
-       FROM characters c
-       WHERE c.is_active = 1
-         AND EXISTS (SELECT 1 FROM character_images ci WHERE ci.character_id = c.id)
-       ORDER BY c.id ASC`
-    : `SELECT c.id, c.name, c.srs_level, c.correct_count, c.wrong_count
-       FROM characters c
-       JOIN categories cat ON c.category_id = cat.id
-       WHERE cat.key = ?
-         AND c.is_active = 1
-         AND EXISTS (SELECT 1 FROM character_images ci WHERE ci.character_id = c.id)
-       ORDER BY c.id ASC`;
-
-  const characters = isMix
-    ? await queryAll<CharacterPoolRow>(c.env.DB, query)
-    : await queryAll<CharacterPoolRow>(c.env.DB, query, body.scope);
+  const nowIso = new Date().toISOString();
+  const { focusIds, candidateIds: initialCandidateIds } = await resolvePoolIds(
+    c.env.DB,
+    body,
+    nowIso
+  );
 
   const need = body.mode === 'classic' ? 3 : 2;
-  if (characters.length < need) {
+
+  if (focusIds !== null && focusIds.length === 0) {
     return c.json(
       {
         error: 'not_enough_characters',
         need,
-        have: characters.length,
+        have: 0,
       },
       422
     );
   }
 
-  // Fetch images for all characters in pool
-  const charIds = characters.map((char) => char.id);
-  const placeholders = charIds.map(() => '?').join(', ');
-  const imageRows = await queryAll<ImageRow>(
-    c.env.DB,
-    `SELECT character_id, url FROM character_images WHERE character_id IN (${placeholders}) ORDER BY position ASC, id ASC`,
-    ...charIds
-  );
+  const candidateIds =
+    focusIds !== null
+      ? await padCandidateIds(c.env.DB, initialCandidateIds, focusIds, body.padPoolTo)
+      : initialCandidateIds;
 
-  const imagesMap = new Map<number, string[]>();
-  for (const img of imageRows) {
-    const list = imagesMap.get(img.character_id) || [];
-    list.push(img.url);
-    imagesMap.set(img.character_id, list);
+  if (candidateIds.length < need) {
+    return c.json(
+      {
+        error: 'not_enough_characters',
+        need,
+        have: candidateIds.length,
+      },
+      422
+    );
   }
 
-  const pool: GameSessionPoolCharacter[] = characters.map((char) => ({
-    id: char.id,
-    name: char.name,
-    images: imagesMap.get(char.id) || [],
-    srsLevel: char.srs_level,
-    correctCount: char.correct_count,
-    wrongCount: char.wrong_count,
-  }));
+  const pool = await hydratePool(c.env.DB, candidateIds);
 
+  const preset = body.preset ?? (body.characterIds ? 'custom' : null);
   const sessionRow = await c.env.DB.prepare(
-    'INSERT INTO game_sessions (scope, mode, planned_rounds, status) VALUES (?, ?, ?, ?) RETURNING id'
+    'INSERT INTO game_sessions (scope, mode, planned_rounds, status, preset) VALUES (?, ?, ?, ?, ?) RETURNING id'
   )
-    .bind(body.scope, body.mode, body.plannedRounds ?? null, 'in_progress')
+    .bind(body.scope, body.mode, body.plannedRounds ?? null, 'in_progress', preset)
     .first<{ id: number }>();
 
   if (!sessionRow) {
@@ -116,6 +353,7 @@ sessionsRouter.post('/', zValidator('json', gameSessionCreateSchema), async (c) 
   const response: GameSessionCreateResponse = {
     sessionId: sessionRow.id,
     pool,
+    focusIds,
   };
 
   return c.json(response, 201);
