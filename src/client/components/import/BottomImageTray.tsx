@@ -24,11 +24,11 @@ export default function BottomImageTray({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   function scrollLeft() {
-    scrollRef.current?.scrollBy({ left: -260, behavior: 'smooth' });
+    scrollRef.current?.scrollBy({ left: -330, behavior: 'smooth' });
   }
 
   function scrollRight() {
-    scrollRef.current?.scrollBy({ left: 260, behavior: 'smooth' });
+    scrollRef.current?.scrollBy({ left: 330, behavior: 'smooth' });
   }
 
   function handleWheel(e: React.WheelEvent<HTMLDivElement>) {
@@ -143,7 +143,7 @@ export default function BottomImageTray({
               return (
                 <div
                   key={`${url}-${idx}`}
-                  className={`group relative shrink-0 aspect-square w-32 sm:w-36 overflow-hidden rounded-button border-2 transition-all cursor-pointer ${
+                  className={`group relative shrink-0 aspect-square w-40 sm:w-[180px] overflow-hidden rounded-button border-2 transition-all cursor-pointer ${
                     isSelected
                       ? isPrimary
                         ? 'border-accent ring-2 ring-accent/40 shadow-md shadow-accent/20'
