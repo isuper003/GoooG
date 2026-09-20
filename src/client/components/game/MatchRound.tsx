@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { motion } from 'motion/react';
+import { toProxiedImageUrl } from '../../lib/imageUrl';
 
 interface MatchRoundProps {
   promptName: string;
@@ -67,7 +68,7 @@ export default function MatchRound({
             >
               {tile.imageUrl ? (
                 <img
-                  src={tile.imageUrl}
+                  src={toProxiedImageUrl(tile.imageUrl)}
                   alt={`Candidate ${index + 1}`}
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"

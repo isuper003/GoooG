@@ -5,6 +5,7 @@ import CategoryCard from '../components/home/CategoryCard';
 import GameSetupModal from '../components/home/GameSetupModal';
 import { apiClient } from '../lib/apiClient';
 import { useCharacters } from '../hooks/useCharacters';
+import { toProxiedImageUrl } from '../lib/imageUrl';
 
 type Scope = 'trans' | 'sluts' | 'twinks' | 'mix';
 
@@ -163,7 +164,7 @@ export default function HomePage() {
             {spotlightHeroImages.map((imgUrl, idx) => (
               <div key={idx} className="relative h-full w-full overflow-hidden">
                 <img
-                  src={imgUrl}
+                  src={toProxiedImageUrl(imgUrl)}
                   alt=""
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover object-top scale-100 group-hover:scale-105 transition-all duration-1000 filter brightness-[0.88] contrast-[1.05]"
@@ -324,7 +325,7 @@ export default function HomePage() {
                   >
                     {thumbImg ? (
                       <img
-                        src={thumbImg}
+                        src={toProxiedImageUrl(thumbImg)}
                         alt={char.name}
                         referrerPolicy="no-referrer"
                         className="w-full h-full object-cover"

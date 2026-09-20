@@ -1,5 +1,6 @@
 import type { CharacterDTO } from '../../../shared/types';
 import type { CharacterSort } from '../../lib/apiClient';
+import { toProxiedImageUrl } from '../../lib/imageUrl';
 
 const CATEGORY_CLASSES: Record<string, string> = {
   trans: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
@@ -72,7 +73,7 @@ export default function CharacterStatsTable({
                       <div className="w-8 h-10 rounded-md overflow-hidden bg-black border border-white/10 shrink-0">
                         {avatar ? (
                           <img
-                            src={avatar}
+                            src={toProxiedImageUrl(avatar)}
                             alt=""
                             referrerPolicy="no-referrer"
                             className="w-full h-full object-cover"

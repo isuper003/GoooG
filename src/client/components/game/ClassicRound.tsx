@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { motion } from 'motion/react';
+import { toProxiedImageUrl } from '../../lib/imageUrl';
 
 interface ClassicRoundProps {
   imageUrl: string;
@@ -40,7 +41,7 @@ export default function ClassicRound({
       <div className="md:col-span-7 relative aspect-[3/4] sm:aspect-[4/4.8] w-full rounded-3xl overflow-hidden border border-white/15 bg-black shadow-2xl group character-glow">
         {imageUrl ? (
           <img
-            src={imageUrl}
+            src={toProxiedImageUrl(imageUrl)}
             alt="Target Performer"
             referrerPolicy="no-referrer"
             className="w-full h-full object-cover object-top filter brightness-[0.95] contrast-[1.05] transition-transform duration-700 group-hover:scale-105"

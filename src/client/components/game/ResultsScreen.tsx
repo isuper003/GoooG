@@ -1,4 +1,5 @@
 import type { MissedCharacter } from '../../hooks/useGameSession';
+import { toProxiedImageUrl } from '../../lib/imageUrl';
 
 interface ResultsScreenProps {
   missedCharacters: MissedCharacter[];
@@ -34,7 +35,7 @@ export default function ResultsScreen({
             <div className="w-full aspect-[3/4] overflow-hidden rounded-xl bg-black border border-white/10">
               {c.imageUrl ? (
                 <img
-                  src={c.imageUrl}
+                  src={toProxiedImageUrl(c.imageUrl)}
                   alt={c.name}
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover"

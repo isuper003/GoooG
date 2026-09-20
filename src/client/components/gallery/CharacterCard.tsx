@@ -1,5 +1,6 @@
 import { motion } from 'motion/react';
 import type { CharacterDTO } from '../../../shared/types';
+import { toProxiedImageUrl } from '../../lib/imageUrl';
 
 const CATEGORY_BADGES: Record<string, { label: string; badgeClass: string }> = {
   trans: { label: 'Trans', badgeClass: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' },
@@ -48,7 +49,7 @@ export default function CharacterCard({
       <div className="relative aspect-[3/4] overflow-hidden bg-black">
         {primaryImage ? (
           <img
-            src={primaryImage}
+            src={toProxiedImageUrl(primaryImage)}
             alt={character.name}
             referrerPolicy="no-referrer"
             loading="lazy"

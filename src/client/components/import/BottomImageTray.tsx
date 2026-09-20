@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { toProxiedImageUrl } from '../../lib/imageUrl';
 
 interface BottomImageTrayProps {
   availableImages: string[];
@@ -153,7 +154,7 @@ export default function BottomImageTray({
                   onClick={() => onToggleImage(url)}
                 >
                   <img
-                    src={url}
+                    src={toProxiedImageUrl(url)}
                     alt={`Candidate ${idx + 1}`}
                     referrerPolicy="no-referrer"
                     loading="lazy"

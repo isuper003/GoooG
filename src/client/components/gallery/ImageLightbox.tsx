@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { toProxiedImageUrl } from '../../lib/imageUrl';
 
 interface ImageLightboxProps {
   images: string[];
@@ -38,7 +39,7 @@ export default function ImageLightbox({ images, characterName, onClose }: ImageL
         <div className="relative aspect-square w-full overflow-hidden rounded-card bg-bg-muted">
           {images[index] ? (
             <img
-              src={images[index]}
+              src={toProxiedImageUrl(images[index])}
               alt={characterName}
               referrerPolicy="no-referrer"
               className="h-full w-full object-contain"
@@ -76,7 +77,7 @@ export default function ImageLightbox({ images, characterName, onClose }: ImageL
                   i === index ? 'border-accent' : 'border-transparent opacity-60'
                 }`}
               >
-                <img src={url} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                <img src={toProxiedImageUrl(url)} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
               </button>
             ))}
           </div>

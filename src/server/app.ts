@@ -7,6 +7,7 @@ import { previewsRouter } from './routes/previews';
 import { sessionsRouter } from './routes/sessions';
 import { statsRouter } from './routes/stats';
 import { crawlerRouter } from './routes/crawler';
+import { proxyRouter } from './routes/proxy';
 
 export type AppEnv = {
   Bindings: {
@@ -51,4 +52,5 @@ app.route('/api/home-previews', previewsRouter);
 app.route('/api/game-sessions', sessionsRouter);
 app.route('/api/stats', statsRouter);
 app.route('/api/crawler', crawlerRouter);
+app.route('/api/image-proxy', proxyRouter);
 

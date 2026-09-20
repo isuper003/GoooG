@@ -10,6 +10,7 @@ import ImageLightbox from '../components/gallery/ImageLightbox';
 import LabelManager from '../components/gallery/LabelManager';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import GameSetupModal from '../components/home/GameSetupModal';
+import { toProxiedImageUrl } from '../lib/imageUrl';
 
 type CategoryFilter = 'trans' | 'sluts' | 'twinks' | undefined;
 type SpecialFilter = 'all' | 'mastered' | 'weak';
@@ -307,7 +308,7 @@ export default function GalleryPage() {
                 <div className="relative aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-xl group">
                   {dossierHeroImg ? (
                     <img
-                      src={dossierHeroImg}
+                      src={toProxiedImageUrl(dossierHeroImg)}
                       alt={activeDossierChar.name}
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
@@ -375,7 +376,7 @@ export default function GalleryPage() {
                           }`}
                         >
                           <img
-                            src={img.url}
+                            src={toProxiedImageUrl(img.url)}
                             alt=""
                             referrerPolicy="no-referrer"
                             className="w-full h-full object-cover"
@@ -497,7 +498,7 @@ export default function GalleryPage() {
                         <div className="w-10 h-13 rounded-lg overflow-hidden bg-black border border-white/10 shrink-0">
                           {thumb ? (
                             <img
-                              src={thumb}
+                              src={toProxiedImageUrl(thumb)}
                               alt=""
                               referrerPolicy="no-referrer"
                               className="w-full h-full object-cover"

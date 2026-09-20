@@ -1,6 +1,7 @@
 import type { CharacterDTO } from '../../../shared/types';
 import LabelMultiSelect from '../shared/LabelMultiSelect';
 import BottomImageTray from './BottomImageTray';
+import { toProxiedImageUrl } from '../../lib/imageUrl';
 
 export interface CrawlerQueueItem {
   id: string;
@@ -78,7 +79,7 @@ export default function CrawledCharacterCard({ item, duplicate, onUpdate }: Craw
           <div className="aspect-square w-14 h-14 rounded-card overflow-hidden border-2 border-bg-hover bg-bg-muted flex items-center justify-center shrink-0 shadow-sm">
             {item.avatarUrl ? (
               <img
-                src={item.avatarUrl}
+                src={toProxiedImageUrl(item.avatarUrl)}
                 alt={item.name}
                 referrerPolicy="no-referrer"
                 className="h-full w-full object-cover"

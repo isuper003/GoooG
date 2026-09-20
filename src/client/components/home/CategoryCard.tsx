@@ -1,4 +1,5 @@
 import { motion } from 'motion/react';
+import { toProxiedImageUrl } from '../../lib/imageUrl';
 
 interface CategoryCardProps {
   title: string;
@@ -27,7 +28,7 @@ export default function CategoryCard({
       <div className="absolute inset-0 bg-black">
         {image ? (
           <img
-            src={image}
+            src={toProxiedImageUrl(image)}
             alt={title}
             referrerPolicy="no-referrer"
             loading="lazy"

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toProxiedImageUrl } from '../../lib/imageUrl';
 
 const MIN_IMAGES = 1;
 const MAX_IMAGES = 6;
@@ -62,7 +63,7 @@ export default function ImageUrlListEditor({ value, onChange }: ImageUrlListEdit
             className="group relative aspect-square overflow-hidden rounded-button border border-bg-hover bg-bg-muted"
           >
             <img
-              src={url}
+              src={toProxiedImageUrl(url)}
               alt=""
               referrerPolicy="no-referrer"
               loading="lazy"

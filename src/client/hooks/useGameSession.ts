@@ -8,6 +8,7 @@ import {
 } from '../../shared/srs';
 import type { GameSessionPoolCharacter } from '../../shared/types';
 import { apiClient } from '../lib/apiClient';
+import { toProxiedImageUrl } from '../lib/imageUrl';
 
 export type GameMode = 'classic' | 'match';
 
@@ -105,7 +106,7 @@ function preloadImage(url: string): Promise<void> {
     const img = new Image();
     img.onload = () => resolve();
     img.onerror = () => resolve();
-    img.src = url;
+    img.src = toProxiedImageUrl(url);
     if (typeof img.decode === 'function') {
       img.decode().then(
         () => resolve(),
