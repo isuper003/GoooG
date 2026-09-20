@@ -51,6 +51,8 @@ export default function CharacterCard({
             src={primaryImage}
             alt={character.name}
             referrerPolicy="no-referrer"
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
             onError={(e) => {
               (e.target as HTMLImageElement).style.opacity = '0.3';

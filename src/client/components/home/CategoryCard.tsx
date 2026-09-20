@@ -30,6 +30,8 @@ export default function CategoryCard({
             src={image}
             alt={title}
             referrerPolicy="no-referrer"
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover object-top scale-100 group-hover:scale-105 transition-transform duration-700 filter brightness-[0.88] contrast-[1.05]"
             onError={(e) => {
               (e.target as HTMLImageElement).style.opacity = '0.3';
