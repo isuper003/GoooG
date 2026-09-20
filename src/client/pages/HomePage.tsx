@@ -202,10 +202,6 @@ export default function HomePage() {
               </span>
             )}
           </div>
-
-          <span className="text-xs font-mono text-white/50 bg-black/60 px-3 py-1.5 rounded-xl border border-white/10 backdrop-blur-md hidden sm:block">
-            Use [← / →] to switch spotlight character
-          </span>
         </div>
 
         {/* Character Identity & Roster Switcher Dock */}
