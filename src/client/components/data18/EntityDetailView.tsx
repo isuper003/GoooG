@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Data18EntityDetail } from '../../../shared/data18Types';
 import { toProxiedImageUrl } from '../../lib/imageUrl';
 import SceneCard from './SceneCard';
@@ -6,6 +7,7 @@ import Pager from './Pager';
 import PerformerAvatar from './PerformerAvatar';
 import PerformerExtraPanel from './PerformerExtraPanel';
 import PornPicsPanel from './PornPicsPanel';
+import AddToCharactersModal from './AddToCharactersModal';
 
 interface EntityDetailViewProps {
   entity: Data18EntityDetail;
@@ -28,6 +30,8 @@ export default function EntityDetailView({
   onPageChange,
   onZoomImage,
 }: EntityDetailViewProps) {
+  const [showAddModal, setShowAddModal] = useState(false);
+
   const pager = (
     <Pager
       page={entity.page}
@@ -126,6 +130,15 @@ export default function EntityDetailView({
               >
                 Data18 ↗
               </a>
+              {entity.type === 'performer' ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(true)}
+                  className="rounded-xl bg-pink-400 px-3 py-1 text-xs font-bold text-black hover:bg-pink-300 transition-colors cursor-pointer"
+                >
+                  ➕ Add to characters
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -172,6 +185,10 @@ export default function EntityDetailView({
           </button>
         </div>
       </div>
+
+      {showAddModal ? (
+        <AddToCharactersModal name={entity.name} onClose={() => setShowAddModal(false)} />
+      ) : null}
 
       {/* Tab Content */}
       {entity.tab !== activeTab ? (
