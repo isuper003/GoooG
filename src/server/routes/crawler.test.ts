@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { extractProfileLinks, extractProfileGallery, upgradeImageResolution, slugifyName } from './crawler';
+import {
+  extractProfileLinks,
+  extractProfileGallery,
+  upgradeImageResolution,
+  slugifyName,
+  getExistingCharactersForCategory,
+} from './crawler';
 
 describe('slugifyName', () => {
   it('lowercases and hyphenates a plain name', () => {
@@ -190,5 +196,69 @@ describe('extractProfileGallery (stage 2: profile page → avatar + album)', () 
     ).join('\n');
     const { images } = extractProfileGallery(cards, baseUrl);
     expect(images.length).toBeLessThanOrEqual(30);
+  });
+});
+
+describe('getExistingCharactersForCategory', () => {
+  it('returns an empty map if db is undefined', async () => {
+    const result = await getExistingCharactersForCategory(undefined, 'sluts');
+    expect(result.size).toBe(0);
+  });
+
+  it('queries existing characters and maps their program images', async () => {
+    const mockDb = {
+      prepare(query: string) {
+        return {
+          bind(...params: unknown[]) {
+            return {
+              async first<T>() {
+                if (query.includes('FROM categories')) {
+                  return { id: 10 } as T;
+                }
+                return null;
+              },
+              async all<T>() {
+                if (query.includes('FROM characters WHERE category_id')) {
+                  return {
+                    results: [
+                      { id: 1, name: 'Angela White' },
+                      { id: 2, name: ' Eva Elfie ' },
+                    ] as T[],
+                  };
+                }
+                if (query.includes('FROM character_images')) {
+                  return {
+                    results: [
+                      { character_id: 1, url: 'https://example.com/angela1.jpg', position: 0 },
+                      { character_id: 1, url: 'https://example.com/angela2.jpg', position: 1 },
+                      { character_id: 2, url: 'https://example.com/eva1.jpg', position: 0 },
+                    ] as T[],
+                  };
+                }
+                return { results: [] as T[] };
+              },
+            };
+          },
+        };
+      },
+    } as unknown as D1Database;
+
+    const result = await getExistingCharactersForCategory(mockDb, 'sluts');
+    expect(result.size).toBe(2);
+
+    const angela = result.get('angela white');
+    expect(angela).toBeDefined();
+    expect(angela?.name).toBe('Angela White');
+    expect(angela?.avatarUrl).toBe('https://example.com/angela1.jpg');
+    expect(angela?.images).toEqual([
+      'https://example.com/angela1.jpg',
+      'https://example.com/angela2.jpg',
+    ]);
+
+    const eva = result.get('eva elfie');
+    expect(eva).toBeDefined();
+    expect(eva?.name).toBe(' Eva Elfie ');
+    expect(eva?.avatarUrl).toBe('https://example.com/eva1.jpg');
+    expect(eva?.images).toEqual(['https://example.com/eva1.jpg']);
   });
 });

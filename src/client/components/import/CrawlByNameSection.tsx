@@ -55,17 +55,30 @@ export default function CrawlByNameSection() {
         return;
       }
 
-      const queueItems: CrawlerQueueItem[] = response.items.map((item, idx) => ({
-        id: `byname-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
-        name: item.name,
-        avatarUrl: item.avatarUrl || '',
-        categoryKey: category,
-        labelIds: [],
-        availableImages: item.availableImages,
-        selectedImages: item.availableImages.slice(0, 6),
-        status: 'pending',
-        isSelected: true,
-      }));
+      const queueItems: CrawlerQueueItem[] = response.items.map((item, idx) => {
+        const duplicate = allCharacters.find(
+          (c) =>
+            c.categoryKey === category &&
+            c.name.trim().toLowerCase() === item.name.trim().toLowerCase()
+        );
+
+        const isDuplicate = !!duplicate;
+        const availableImages = duplicate
+          ? duplicate.images.map((img) => img.url)
+          : item.availableImages;
+
+        return {
+          id: `byname-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
+          name: item.name,
+          avatarUrl: duplicate?.images[0]?.url || item.avatarUrl || '',
+          categoryKey: category,
+          labelIds: duplicate ? duplicate.labels.map((l) => l.id) : [],
+          availableImages,
+          selectedImages: availableImages.slice(0, 6),
+          status: 'pending',
+          isSelected: !isDuplicate,
+        };
+      });
 
       loadQueue(queueItems, true);
       setNamesText('');

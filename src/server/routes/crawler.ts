@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../app';
+import { queryAll, queryOne, queryAllChunked } from '../db';
 
 export const crawlerRouter = new Hono<AppEnv>();
 
@@ -294,6 +295,70 @@ async function fetchProfilesInBatches(
   return items;
 }
 
+export interface ExistingCharacterData {
+  id: number;
+  name: string;
+  avatarUrl: string;
+  images: string[];
+}
+
+export async function getExistingCharactersForCategory(
+  db: D1Database | undefined,
+  categoryKey: string
+): Promise<Map<string, ExistingCharacterData>> {
+  const map = new Map<string, ExistingCharacterData>();
+  if (!db) return map;
+
+  try {
+    const categoryRow = await queryOne<{ id: number }>(
+      db,
+      'SELECT id FROM categories WHERE key = ?',
+      categoryKey
+    );
+    if (!categoryRow) return map;
+
+    const existingRows = await queryAll<{ id: number; name: string }>(
+      db,
+      'SELECT id, name FROM characters WHERE category_id = ?',
+      categoryRow.id
+    );
+    if (existingRows.length === 0) return map;
+
+    const charIds = existingRows.map((r) => r.id);
+    const imageRows = await queryAllChunked<{
+      character_id: number;
+      url: string;
+      position: number;
+    }>(
+      db,
+      (placeholders) =>
+        `SELECT character_id, url, position FROM character_images WHERE character_id IN (${placeholders}) ORDER BY position ASC, id ASC`,
+      charIds
+    );
+
+    const imagesByCharId = new Map<number, string[]>();
+    for (const img of imageRows) {
+      const list = imagesByCharId.get(img.character_id) || [];
+      list.push(img.url);
+      imagesByCharId.set(img.character_id, list);
+    }
+
+    for (const char of existingRows) {
+      const imgs = imagesByCharId.get(char.id) || [];
+      map.set(char.name.trim().toLowerCase(), {
+        id: char.id,
+        name: char.name,
+        avatarUrl: imgs[0] || '',
+        images: imgs,
+      });
+    }
+  } catch (err) {
+    console.error('Error fetching existing characters in crawler:', err);
+  }
+
+  return map;
+}
+
 // POST /api/crawler/fetch
 crawlerRouter.post('/fetch', zValidator('json', crawlerFetchSchema), async (c) => {
   const { url, categoryKey } = c.req.valid('json');
@@ -314,7 +379,45 @@ crawlerRouter.post('/fetch', zValidator('json', crawlerFetchSchema), async (c) =
   }
 
   const profileLinks = extractProfileLinks(listingHtml, url).slice(0, MAX_PROFILES_PER_CRAWL);
-  const items = await fetchProfilesInBatches(profileLinks, categoryKey);
+  const existingMap = await getExistingCharactersForCategory(c.env?.DB, categoryKey);
+
+  // Separate links that already exist from new links that need fetching from website
+  const linksToFetch: ProfileLink[] = [];
+  for (const link of profileLinks) {
+    if (!existingMap.has(link.name.trim().toLowerCase())) {
+      linksToFetch.push(link);
+    }
+  }
+
+  // Fetch only non-duplicate profiles from the external website
+  const fetchedItems = await fetchProfilesInBatches(linksToFetch, categoryKey);
+  const fetchedMap = new Map<string, ExtractedItem>();
+  for (const item of fetchedItems) {
+    fetchedMap.set(item.name.trim().toLowerCase(), item);
+  }
+
+  // Assemble items in original listing order:
+  // Duplicates use existing images from program; new characters use crawled images
+  const items: ExtractedItem[] = profileLinks.map((link) => {
+    const key = link.name.trim().toLowerCase();
+    const existing = existingMap.get(key);
+    if (existing) {
+      return {
+        name: link.name,
+        avatarUrl: existing.avatarUrl,
+        categoryKey,
+        availableImages: existing.images,
+      };
+    }
+    return (
+      fetchedMap.get(key) || {
+        name: link.name,
+        avatarUrl: '',
+        categoryKey,
+        availableImages: [],
+      }
+    );
+  });
 
   return c.json({
     url,
@@ -328,12 +431,44 @@ crawlerRouter.post('/fetch', zValidator('json', crawlerFetchSchema), async (c) =
 crawlerRouter.post('/fetch-by-name', zValidator('json', crawlerFetchByNameSchema), async (c) => {
   const { names, categoryKey } = c.req.valid('json');
 
-  const links: ProfileLink[] = names.map((name) => ({
-    name,
-    profileUrl: `${PROFILE_BASE_URL}${slugifyName(name)}/`,
-  }));
+  const existingMap = await getExistingCharactersForCategory(c.env?.DB, categoryKey);
 
-  const items = await fetchProfilesInBatches(links, categoryKey);
+  const linksToFetch: ProfileLink[] = [];
+  for (const name of names) {
+    if (!existingMap.has(name.trim().toLowerCase())) {
+      linksToFetch.push({
+        name,
+        profileUrl: `${PROFILE_BASE_URL}${slugifyName(name)}/`,
+      });
+    }
+  }
+
+  const fetchedItems = await fetchProfilesInBatches(linksToFetch, categoryKey);
+  const fetchedMap = new Map<string, ExtractedItem>();
+  for (const item of fetchedItems) {
+    fetchedMap.set(item.name.trim().toLowerCase(), item);
+  }
+
+  const items: ExtractedItem[] = names.map((name) => {
+    const key = name.trim().toLowerCase();
+    const existing = existingMap.get(key);
+    if (existing) {
+      return {
+        name,
+        avatarUrl: existing.avatarUrl,
+        categoryKey,
+        availableImages: existing.images,
+      };
+    }
+    return (
+      fetchedMap.get(key) || {
+        name,
+        avatarUrl: '',
+        categoryKey,
+        availableImages: [],
+      }
+    );
+  });
 
   return c.json({
     categoryKey,

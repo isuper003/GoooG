@@ -60,18 +60,31 @@ export default function CrawlerSection() {
         return;
       }
 
-      // Auto-select the first 6 gallery images; the rest stay browsable in the tray
-      const queueItems: CrawlerQueueItem[] = response.items.map((item, idx) => ({
-        id: `crawled-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
-        name: item.name,
-        avatarUrl: item.avatarUrl || '',
-        categoryKey: activeCategory,
-        labelIds: [],
-        availableImages: item.availableImages,
-        selectedImages: item.availableImages.slice(0, 6),
-        status: 'pending',
-        isSelected: true,
-      }));
+      // Auto-select the first 6 gallery images; for duplicates: deselect and display program images
+      const queueItems: CrawlerQueueItem[] = response.items.map((item, idx) => {
+        const duplicate = allCharacters.find(
+          (c) =>
+            c.categoryKey === activeCategory &&
+            c.name.trim().toLowerCase() === item.name.trim().toLowerCase()
+        );
+
+        const isDuplicate = !!duplicate;
+        const availableImages = duplicate
+          ? duplicate.images.map((img) => img.url)
+          : item.availableImages;
+
+        return {
+          id: `crawled-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
+          name: item.name,
+          avatarUrl: duplicate?.images[0]?.url || item.avatarUrl || '',
+          categoryKey: activeCategory,
+          labelIds: duplicate ? duplicate.labels.map((l) => l.id) : [],
+          availableImages,
+          selectedImages: availableImages.slice(0, 6),
+          status: 'pending',
+          isSelected: !isDuplicate,
+        };
+      });
 
       loadQueue(queueItems);
     } catch (err: unknown) {
