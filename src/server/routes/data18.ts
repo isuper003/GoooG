@@ -114,6 +114,27 @@ data18Router.get('/movies', zValidator('query', pageQuery), async (c) => {
   }
 });
 
+// 2b. GET /api/data18/upcoming?page=1 — scenes announced for the coming days
+data18Router.get('/upcoming', zValidator('query', pageQuery), async (c) => {
+  const { page } = c.req.valid('query');
+  try {
+    const html = await getHtml(
+      c,
+      `/sys/page.php?t=1&b=2&o=0&html=upcoming&html2=&total=&doquery=1&spage=${page}&dopage=1`,
+      { ttlMs: TTL_LISTING }
+    );
+    const response: Data18ScenesResponse = {
+      page,
+      scenes: parseScenesFromData18(html),
+      totalFound: parseTotalFound(html, 'Scenes'),
+    };
+    cached(c, TTL_LISTING);
+    return c.json(response);
+  } catch (err) {
+    return fail(c, err, 'Failed to fetch upcoming scenes from Data18');
+  }
+});
+
 // 3. GET /api/data18/search?q=cory&type=performer
 data18Router.get(
   '/search',

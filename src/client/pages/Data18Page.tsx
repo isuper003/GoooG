@@ -2,18 +2,16 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { Data18SearchResult } from '../../shared/data18Types';
 import { movieHref, performerHref, sceneHref, studioHref, toSitePath } from '../lib/data18Nav';
-import { useData18Entity, useData18Movies, useData18Scenes } from '../hooks/useData18';
-import SceneCard from '../components/data18/SceneCard';
-import MovieCard from '../components/data18/MovieCard';
+import { useData18Entity } from '../hooks/useData18';
 import EntitySearchBar from '../components/data18/EntitySearchBar';
 import EntityDetailView from '../components/data18/EntityDetailView';
 import FollowingFeed from '../components/data18/FollowingFeed';
-import Pager from '../components/data18/Pager';
+import { InfiniteMovieList, InfiniteSceneList } from '../components/data18/InfiniteLists';
 import ImageLightbox from '../components/gallery/ImageLightbox';
 
-type Data18Mode = 'scenes' | 'movies' | 'performers' | 'studios' | 'following';
+type Data18Mode = 'scenes' | 'upcoming' | 'movies' | 'performers' | 'studios' | 'following';
 
-const MODES: Data18Mode[] = ['scenes', 'movies', 'performers', 'studios', 'following'];
+const MODES: Data18Mode[] = ['scenes', 'upcoming', 'movies', 'performers', 'studios', 'following'];
 
 const POPULAR_PERFORMERS = [
   { name: 'Cory Chase', slug: 'cory-chase' },
@@ -41,16 +39,6 @@ function positiveInt(value: string | null): number {
   return Number.isFinite(n) && n >= 1 ? n : 1;
 }
 
-function ErrorBox({ message, className = '' }: { message: string; className?: string }) {
-  return (
-    <div
-      className={`rounded-2xl border border-rose-500/30 bg-rose-500/10 p-8 text-center text-sm text-rose-300 ${className}`}
-    >
-      {message}
-    </div>
-  );
-}
-
 export default function Data18Page() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
@@ -63,8 +51,6 @@ export default function Data18Page() {
   const entityPage = positiveInt(params.get('epage'));
   const entityTab: 'scenes' | 'movies' = params.get('etab') === 'movies' ? 'movies' : 'scenes';
 
-  const scenesQuery = useData18Scenes(page, !entityPath && mode === 'scenes');
-  const moviesQuery = useData18Movies(page, !entityPath && mode === 'movies');
   const entityQuery = useData18Entity(entityPath, entityPage, entityTab);
 
   function update(changes: Record<string, string | null>) {
@@ -80,11 +66,6 @@ export default function Data18Page() {
     setParams(next === 'scenes' ? {} : { mode: next });
   }
 
-  function setListPage(next: number) {
-    update({ page: next === 1 ? null : String(next) });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
   function handleSearchResult(result: Data18SearchResult) {
     if (result.type === 'scene') {
       navigate(sceneHref(result.slug));
@@ -98,9 +79,6 @@ export default function Data18Page() {
   function openEntity(href: string) {
     navigate(href);
   }
-
-  const scenes = scenesQuery.data?.scenes ?? [];
-  const movies = moviesQuery.data?.movies ?? [];
 
   return (
     <div className="space-y-6">
@@ -125,6 +103,7 @@ export default function Data18Page() {
           {(
             [
               ['scenes', '🎬', 'Latest Scenes', 'bg-cyan-400 text-black shadow-md shadow-cyan-400/20'],
+              ['upcoming', '🗓️', 'Upcoming', 'bg-emerald-400 text-black shadow-md shadow-emerald-400/20'],
               ['movies', '📼', 'Latest Movies', 'bg-amber-400 text-black shadow-md shadow-amber-400/20'],
               ['performers', '⭐', 'By Performer', 'bg-white text-black shadow-md'],
               ['studios', '🏢', 'By Studio / Series', 'bg-rose-400 text-black shadow-md'],
@@ -181,94 +160,15 @@ export default function Data18Page() {
             onZoomImage={setLightboxImage}
           />
         )
-      ) : mode === 'scenes' ? (
-        <div className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-xs font-mono text-white/50">
-              Recently released scenes
-              {scenesQuery.data?.totalFound
-                ? ` • ${scenesQuery.data.totalFound.toLocaleString()} in database`
-                : ''}
-            </span>
-            <Pager page={page} isLoading={scenesQuery.isFetching} onChange={setListPage} />
-          </div>
-
-          {scenesQuery.isPending ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="aspect-video w-full rounded-2xl bg-white/[0.03] animate-pulse border border-white/5" />
-              ))}
-            </div>
-          ) : scenesQuery.isError ? (
-            <ErrorBox
-              message={scenesQuery.error instanceof Error ? scenesQuery.error.message : 'Failed to load scenes'}
-            />
-          ) : scenes.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-12 text-center text-white/40 text-sm">
-              No scenes found on this page.
-            </div>
-          ) : (
-            <div
-              className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5 transition-opacity ${
-                scenesQuery.isPlaceholderData ? 'opacity-50' : ''
-              }`}
-            >
-              {scenes.map((scene) => (
-                <SceneCard key={scene.id} scene={scene} onZoomImage={setLightboxImage} />
-              ))}
-            </div>
-          )}
-
-          {scenes.length > 0 ? (
-            <div className="flex justify-center pt-4 border-t border-white/10">
-              <Pager page={page} isLoading={scenesQuery.isFetching} onChange={setListPage} />
-            </div>
-          ) : null}
-        </div>
+      ) : mode === 'scenes' || mode === 'upcoming' ? (
+        <InfiniteSceneList
+          key={`${mode}-${page}`}
+          kind={mode === 'upcoming' ? 'upcoming' : 'latest'}
+          startPage={page}
+          onZoomImage={setLightboxImage}
+        />
       ) : mode === 'movies' ? (
-        <div className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-xs font-mono text-white/50">
-              Recently released movies
-              {moviesQuery.data?.totalFound
-                ? ` • ${moviesQuery.data.totalFound.toLocaleString()} in database`
-                : ''}
-            </span>
-            <Pager page={page} accent="amber" isLoading={moviesQuery.isFetching} onChange={setListPage} />
-          </div>
-
-          {moviesQuery.isPending ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="aspect-[1/1.42] w-full rounded-2xl bg-white/[0.03] animate-pulse border border-white/5" />
-              ))}
-            </div>
-          ) : moviesQuery.isError ? (
-            <ErrorBox
-              message={moviesQuery.error instanceof Error ? moviesQuery.error.message : 'Failed to load movies'}
-            />
-          ) : movies.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-12 text-center text-white/40 text-sm">
-              No movies found on this page.
-            </div>
-          ) : (
-            <div
-              className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 transition-opacity ${
-                moviesQuery.isPlaceholderData ? 'opacity-50' : ''
-              }`}
-            >
-              {movies.map((movie) => (
-                <MovieCard key={movie.id} movie={movie} onZoomImage={setLightboxImage} />
-              ))}
-            </div>
-          )}
-
-          {movies.length > 0 ? (
-            <div className="flex justify-center pt-4 border-t border-white/10">
-              <Pager page={page} accent="amber" isLoading={moviesQuery.isFetching} onChange={setListPage} />
-            </div>
-          ) : null}
-        </div>
+        <InfiniteMovieList key={`movies-${page}`} startPage={page} onZoomImage={setLightboxImage} />
       ) : mode === 'following' ? (
         <FollowingFeed onZoomImage={setLightboxImage} />
       ) : mode === 'performers' ? (

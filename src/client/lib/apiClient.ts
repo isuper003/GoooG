@@ -191,6 +191,9 @@ export const apiClient = {
   getData18Scenes: (page = 1) =>
     request<Data18ScenesResponse>(`/api/data18/scenes?page=${page}`),
 
+  getData18Upcoming: (page = 1) =>
+    request<Data18ScenesResponse>(`/api/data18/upcoming?page=${page}`),
+
   getData18Movies: (page = 1) =>
     request<Data18MoviesResponse>(`/api/data18/movies?page=${page}`),
 
