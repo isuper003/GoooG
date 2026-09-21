@@ -6,6 +6,7 @@ import { movieHref, sceneHref, studioHref, toSitePath, entityHref } from '../../
 import ImageLightbox from '../gallery/ImageLightbox';
 import CastSection from './CastSection';
 import TagList from './TagList';
+import WatchSearchMenu from './WatchSearchMenu';
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
@@ -92,14 +93,25 @@ export default function SceneDetailView({ scene }: { scene: Data18SceneDetail })
               ) : null}
             </dl>
 
-            <a
-              href={scene.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-auto w-fit rounded-xl border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-semibold text-white/70 hover:text-white hover:bg-white/10 transition-all"
-            >
-              Open on Data18 ↗
-            </a>
+            <div className="mt-auto flex flex-wrap items-center gap-2 pt-2">
+              <WatchSearchMenu
+                title={scene.title}
+                movieTitle={scene.movie?.title}
+                studioName={scene.studio?.name}
+                castNames={scene.cast?.map((c) => c.name)}
+                align="left"
+                variant="detail"
+              />
+
+              <a
+                href={scene.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-fit rounded-xl border border-white/10 bg-white/[0.05] px-3.5 py-1.5 text-xs font-semibold text-white/70 hover:text-white hover:bg-white/10 transition-all"
+              >
+                Open on Data18 ↗
+              </a>
+            </div>
           </div>
         </div>
       </div>
