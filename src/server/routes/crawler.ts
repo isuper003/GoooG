@@ -14,6 +14,7 @@ const crawlerFetchSchema = z.object({
 const crawlerFetchByNameSchema = z.object({
   names: z.array(z.string().trim().min(1)).min(1).max(40),
   categoryKey: z.enum(['trans', 'sluts', 'twinks']).default('sluts'),
+  forceWeb: z.boolean().optional().default(false),
 });
 
 export interface ExtractedItem {
@@ -429,9 +430,11 @@ crawlerRouter.post('/fetch', zValidator('json', crawlerFetchSchema), async (c) =
 
 // POST /api/crawler/fetch-by-name
 crawlerRouter.post('/fetch-by-name', zValidator('json', crawlerFetchByNameSchema), async (c) => {
-  const { names, categoryKey } = c.req.valid('json');
+  const { names, categoryKey, forceWeb } = c.req.valid('json');
 
-  const existingMap = await getExistingCharactersForCategory(c.env?.DB, categoryKey);
+  const existingMap = forceWeb
+    ? new Map<string, ExistingCharacterData>()
+    : await getExistingCharactersForCategory(c.env?.DB, categoryKey);
 
   const linksToFetch: ProfileLink[] = [];
   for (const name of names) {

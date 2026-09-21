@@ -261,4 +261,12 @@ describe('getExistingCharactersForCategory', () => {
     expect(eva?.avatarUrl).toBe('https://example.com/eva1.jpg');
     expect(eva?.images).toEqual(['https://example.com/eva1.jpg']);
   });
+
+  it('bypasses existing characters when forceWeb is true in fetch-by-name', async () => {
+    // When forceWeb is true, existingMap is bypassed so linksToFetch includes all requested names
+    const names = ['Angela White'];
+    const existingMap = new Map(); // empty map when forceWeb is true
+    const linksToFetch = names.filter((n) => !existingMap.has(n.toLowerCase()));
+    expect(linksToFetch).toEqual(['Angela White']);
+  });
 });

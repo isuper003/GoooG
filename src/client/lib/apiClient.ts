@@ -164,10 +164,14 @@ export const apiClient = {
       body: JSON.stringify({ url, categoryKey }),
     }),
 
-  crawlByNames: (names: string[], categoryKey: 'trans' | 'sluts' | 'twinks' = 'sluts') =>
+  crawlByNames: (
+    names: string[],
+    categoryKey: 'trans' | 'sluts' | 'twinks' = 'sluts',
+    forceWeb = false
+  ) =>
     request<CrawlResponse>('/api/crawler/fetch-by-name', {
       method: 'POST',
-      body: JSON.stringify({ names, categoryKey }),
+      body: JSON.stringify({ names, categoryKey, forceWeb }),
     }),
 };
 
