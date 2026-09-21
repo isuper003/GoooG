@@ -42,6 +42,7 @@ export interface UseGameSessionInput {
     classicSamples: number;
     matchSamples: number;
   } | null;
+  drill?: { masteryTarget: number } | null;
 }
 
 interface ClassicRoundData {
@@ -225,6 +226,11 @@ export function useGameSession(input: UseGameSessionInput) {
       return createRoundPicker(poolMembers);
     })()
   );
+  const drillTrackerRef = useRef<RemediationTracker | null>(
+    input.drill && input.focusIds && input.focusIds.length > 0
+      ? createRemediationTracker(input.focusIds, input.drill.masteryTarget)
+      : null
+  );
   const remediationTrackerRef = useRef<RemediationTracker | null>(null);
   const answersRef = useRef<AnswerRecord[]>([]);
   const missedIdsRef = useRef<Set<number>>(new Set());
@@ -248,13 +254,30 @@ export function useGameSession(input: UseGameSessionInput) {
   const [remediationProgress, setRemediationProgress] = useState<RemediationProgress | null>(
     null
   );
+  const [drillProgress, setDrillProgress] = useState<RemediationProgress | null>(() =>
+    drillTrackerRef.current
+      ? {
+          masteredCount: drillTrackerRef.current.getMasteredCount(),
+          totalCount: drillTrackerRef.current.getTotalCount(),
+        }
+      : null
+  );
   const [finalSummary, setFinalSummary] = useState<FinalSummary | null>(null);
+
+  function getNextMainTargetId(): number | null {
+    const drillTracker = drillTrackerRef.current;
+    return drillTracker ? drillTracker.getNextTarget() : pickerRef.current.next().id;
+  }
 
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
 
-    const firstTargetId = pickerRef.current.next().id;
+    const firstTargetId = getNextMainTargetId();
+    if (firstTargetId === null) {
+      finalizeSession();
+      return;
+    }
     const firstRound = buildRoundData(
       firstTargetId,
       input.mode,
@@ -388,14 +411,21 @@ export function useGameSession(input: UseGameSessionInput) {
   }
 
   async function advanceMain() {
-    const reachedPlanned =
-      input.plannedRounds !== null && mainRoundIndexRef.current >= input.plannedRounds;
-    if (reachedPlanned) {
+    const drillTracker = drillTrackerRef.current;
+    const isComplete = drillTracker
+      ? drillTracker.isComplete() || drillTracker.getNextTarget() === null
+      : input.plannedRounds !== null && mainRoundIndexRef.current >= input.plannedRounds;
+    if (isComplete) {
       await wait(FEEDBACK_MS);
       goToResults();
       return;
     }
-    const nextId = pickerRef.current.next().id;
+    const nextId = getNextMainTargetId();
+    if (nextId === null) {
+      await wait(FEEDBACK_MS);
+      goToResults();
+      return;
+    }
     const next = buildRoundData(nextId, input.mode, liveCharsRef.current, input.confusion);
     await Promise.all([wait(FEEDBACK_MS), preloadRound(next)]);
     setCurrentRound(next);
@@ -484,6 +514,14 @@ export function useGameSession(input: UseGameSessionInput) {
     if (phase === 'main') {
       mainRoundIndexRef.current += 1;
       if (!isCorrect) missedIdsRef.current.add(targetId);
+      const drillTracker = drillTrackerRef.current;
+      if (drillTracker) {
+        drillTracker.applyAnswer(targetId, isCorrect);
+        setDrillProgress({
+          masteredCount: drillTracker.getMasteredCount(),
+          totalCount: drillTracker.getTotalCount(),
+        });
+      }
     } else {
       remediationRoundIndexRef.current += 1;
       const tracker = remediationTrackerRef.current;
@@ -568,6 +606,7 @@ export function useGameSession(input: UseGameSessionInput) {
       plannedRounds: input.plannedRounds,
       missedCharacters,
       remediationProgress,
+      drillProgress,
       finalSummary,
       submitAnswer,
       endSessionEarly,
@@ -584,6 +623,7 @@ export function useGameSession(input: UseGameSessionInput) {
       roundNumber,
       missedCharacters,
       remediationProgress,
+      drillProgress,
       finalSummary,
     ]
   );

@@ -25,6 +25,7 @@ interface GameLocationState {
     classicSamples: number;
     matchSamples: number;
   } | null;
+  drill?: { masteryTarget: number } | null;
 }
 
 function isGameLocationState(state: unknown): state is GameLocationState {
@@ -74,6 +75,7 @@ function ActiveGame({ state }: { state: GameLocationState }) {
     focusIds: state.focusIds,
     confusion: state.confusion,
     latencyBaseline: state.latencyBaseline,
+    drill: state.drill,
   });
   const [confirmingEnd, setConfirmingEnd] = useState(false);
 
@@ -95,16 +97,28 @@ function ActiveGame({ state }: { state: GameLocationState }) {
             {/* Arena Top Status Bar */}
             <div className="w-full max-w-4xl flex items-center justify-between pb-4 border-b border-white/[0.08]">
               <div className="flex items-center gap-3">
-                <span className="text-xs font-mono text-white/40 uppercase tracking-wider">Round</span>
-                <span className="text-lg font-display font-bold text-white">
-                  {game.roundNumber}{' '}
-                  <span className="text-white/30 text-sm font-normal">
-                    / {game.plannedRounds ?? '∞'}
+                {game.drillProgress ? (
+                  <span className="text-lg font-display font-bold text-white">
+                    {game.drillProgress.masteredCount} of {game.drillProgress.totalCount} rescued
                   </span>
-                </span>
+                ) : (
+                  <>
+                    <span className="text-xs font-mono text-white/40 uppercase tracking-wider">Round</span>
+                    <span className="text-lg font-display font-bold text-white">
+                      {game.roundNumber}{' '}
+                      <span className="text-white/30 text-sm font-normal">
+                        / {game.plannedRounds ?? '∞'}
+                      </span>
+                    </span>
+                  </>
+                )}
                 <span className="text-white/20">|</span>
                 <span className="text-xs font-mono text-cyan-400 font-semibold uppercase">
-                  {game.currentRound.mode === 'classic' ? 'Classic' : 'Match'}
+                  {game.drillProgress
+                    ? 'Rescue Drill'
+                    : game.currentRound.mode === 'classic'
+                      ? 'Classic'
+                      : 'Match'}
                 </span>
               </div>
 

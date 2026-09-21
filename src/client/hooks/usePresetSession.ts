@@ -42,6 +42,7 @@ export function usePresetSession(): {
           focusIds: response.focusIds ?? null,
           confusion: response.confusion ?? null,
           latencyBaseline: response.latencyBaseline ?? null,
+          drill: preset === 'leech' ? { masteryTarget: 3 } : null,
         },
       });
     } catch (err) {

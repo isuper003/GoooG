@@ -3,6 +3,7 @@ import type { CharacterSort } from '../lib/apiClient';
 import { useStatsOverview, useConfusions } from '../hooks/useStats';
 import { useCharacters } from '../hooks/useCharacters';
 import OverviewCards from '../components/stats/OverviewCards';
+import LeechAlert from '../components/stats/LeechAlert';
 import CategoryAccuracyChart from '../components/stats/CategoryAccuracyChart';
 import SrsDistributionChart from '../components/stats/SrsDistributionChart';
 import ConfusedPairsList from '../components/stats/ConfusedPairsList';
@@ -41,6 +42,7 @@ export default function StatsPage() {
         </div>
       ) : (
         <>
+          <LeechAlert />
           <OverviewCards stats={overview} />
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
