@@ -273,15 +273,70 @@ async function fetchWithFallbacks(url: string, headers: Record<string, string>):
 export interface FetchOptions {
   /** How long a successful response may be served from cache. */
   ttlMs?: number;
+  /** When given, D1 is used as a persistent cache level (survives Worker restarts). */
+  db?: D1Database;
+}
+
+// ---------------------------------------------------------------------------
+// Persistent cache (D1). Best-effort: every failure falls through to the network.
+// ---------------------------------------------------------------------------
+
+// D1 rows are limited in size, so oversized pages (e.g. huge filter panels) are not stored.
+const MAX_DB_BODY_CHARS = 900_000;
+// An expired row may still be served when Data18 itself is failing, for this long.
+const STALE_GRACE_MS = 24 * 60 * 60_000;
+const PURGE_PROBABILITY = 0.02;
+
+interface CacheRow {
+  body: string;
+  expires_at: number;
+}
+
+async function dbGet(db: D1Database, key: string): Promise<CacheRow | undefined> {
+  try {
+    const row = await db
+      .prepare('SELECT body, expires_at FROM data18_cache WHERE cache_key = ?')
+      .bind(key)
+      .first<CacheRow>();
+    if (!row || row.expires_at + STALE_GRACE_MS < Date.now()) return undefined;
+    return row;
+  } catch {
+    return undefined;
+  }
+}
+
+async function dbSet(db: D1Database, key: string, body: string, ttlMs: number): Promise<void> {
+  if (body.length > MAX_DB_BODY_CHARS) return;
+  try {
+    const now = Date.now();
+    await db
+      .prepare('INSERT OR REPLACE INTO data18_cache (cache_key, body, expires_at) VALUES (?, ?, ?)')
+      .bind(key, body, now + ttlMs)
+      .run();
+    // Housekeeping: drop rows that are too old to be served even as a stale fallback.
+    if (Math.random() < PURGE_PROBABILITY) {
+      await db.prepare('DELETE FROM data18_cache WHERE expires_at < ?').bind(now - STALE_GRACE_MS).run();
+    }
+  } catch {
+    // The cache is an optimisation, never a reason to fail a request.
+  }
+}
+
+/** Errors that mean "Data18 is unavailable right now" (as opposed to "this page does not exist"). */
+function isUpstreamFailure(err: unknown): boolean {
+  return err instanceof Data18Error && (err.status === 429 || err.status === 502 || err.status === 504);
 }
 
 /**
  * Fetches a Data18 page (path starting with `/`), with a timeout, limited concurrency,
- * de-duplication of identical in-flight requests and a two-level cache.
+ * de-duplication of identical in-flight requests and a layered cache: memory, then D1
+ * (when a binding is given), then the Workers Cache API. If Data18 is failing, an expired
+ * D1 entry (up to a day old) is served instead of an error.
  */
 export async function fetchData18Html(path: string, options: FetchOptions = {}): Promise<string> {
   if (!path.startsWith('/')) throw new Data18Error('Invalid Data18 path', 400);
   const ttlMs = options.ttlMs ?? 5 * 60_000;
+  const { db } = options;
   const url = `${ORIGIN}${path}`;
 
   const cached = cacheGet(url);
@@ -296,13 +351,33 @@ export async function fetchData18Html(path: string, options: FetchOptions = {}):
     : { ...BASE_HEADERS };
 
   const promise = (async () => {
+    const stored = db ? await dbGet(db, url) : undefined;
+    const now = Date.now();
+    if (stored && stored.expires_at >= now) {
+      cacheSet(url, stored.body, Math.min(ttlMs, stored.expires_at - now));
+      return stored.body;
+    }
+
     const edge = await edgeGet(url);
     if (edge !== undefined) {
       cacheSet(url, edge, ttlMs);
       return edge;
     }
-    const html = await withSlot(() => fetchWithFallbacks(url, headers));
+
+    let html: string;
+    try {
+      html = await withSlot(() => fetchWithFallbacks(url, headers));
+    } catch (err) {
+      if (stored && isUpstreamFailure(err)) {
+        // Serve the expired copy, but only briefly from memory so the next request retries.
+        cacheSet(url, stored.body, 60_000);
+        return stored.body;
+      }
+      throw err;
+    }
+
     cacheSet(url, html, ttlMs);
+    if (db) await dbSet(db, url, html, ttlMs);
     void edgeSet(url, html, ttlMs);
     return html;
   })().finally(() => inflight.delete(url));
@@ -314,4 +389,9 @@ export async function fetchData18Html(path: string, options: FetchOptions = {}):
 /** Cache-Control value for JSON responses that are derived from a cached page. */
 export function cacheControl(ttlMs: number): string {
   return `public, max-age=${Math.floor(ttlMs / 1000)}`;
+}
+
+/** Test hook: forgets every in-memory cache entry. */
+export function clearMemoryCache(): void {
+  memoryCache.clear();
 }

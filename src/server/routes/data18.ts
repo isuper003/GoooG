@@ -56,6 +56,12 @@ function fail(c: Context<AppEnv>, err: unknown, fallback: string) {
   return c.json({ error: msg || fallback }, 502);
 }
 
+// All Data18 pages go through the shared fetch layer; when a D1 binding exists it also
+// backs the cache so entries survive Worker restarts.
+function getHtml(c: Context<AppEnv>, path: string, options: { ttlMs?: number } = {}) {
+  return fetchData18Html(path, { ...options, db: c.env?.DB });
+}
+
 function cached(c: Context<AppEnv>, ttlMs: number) {
   c.header('Cache-Control', cacheControl(ttlMs));
 }
@@ -68,7 +74,8 @@ const pageQuery = z.object({
 data18Router.get('/scenes', zValidator('query', pageQuery), async (c) => {
   const { page } = c.req.valid('query');
   try {
-    const html = await fetchData18Html(
+    const html = await getHtml(
+      c,
       `/sys/page.php?t=1&b=2&o=0&html=index&html2=&total=0&doquery=1&spage=${page}&dopage=1`,
       { ttlMs: TTL_LISTING }
     );
@@ -88,7 +95,8 @@ data18Router.get('/scenes', zValidator('query', pageQuery), async (c) => {
 data18Router.get('/movies', zValidator('query', pageQuery), async (c) => {
   const { page } = c.req.valid('query');
   try {
-    const html = await fetchData18Html(
+    const html = await getHtml(
+      c,
       `/sys/page.php?t=1&b=3&o=0&html=index&html2=&total=0&doquery=1&spage=${page}&dopage=1`,
       { ttlMs: TTL_LISTING }
     );
@@ -119,7 +127,8 @@ data18Router.get(
     const searchTypes = { performer: 3, studio: 2, series: 4 } as const;
     const search = async (kind: keyof typeof searchTypes) => {
       const k = encodeURIComponent(q);
-      const html = await fetchData18Html(
+      const html = await getHtml(
+      c,
         `/sys/live.php?key=${k}&key2=${k}&keyfull=${k}&t=${searchTypes[kind]}&b=1&page=1`,
         { ttlMs: TTL_SEARCH }
       );
@@ -173,7 +182,7 @@ data18Router.get(
     if (!listPath) return c.json({ error: 'This page has no movies tab' }, 404);
 
     try {
-      const firstHtml = await fetchData18Html(listPath, { ttlMs: TTL_ENTITY });
+      const firstHtml = await getHtml(c, listPath, { ttlMs: TTL_ENTITY });
       const detail = parseEntityDetailFromHtml(firstHtml, path, page, tab);
       if (tab === 'movies') detail.scenes = [];
 
@@ -186,12 +195,12 @@ data18Router.get(
         const loadPath = extractLoadPagesPath(firstHtml);
         let template = loadPath ? deriveEntityPageTemplate(loadPath) : null;
         if (!template && loadPath) {
-          template = extractPageTemplate(await fetchData18Html(loadPath, { ttlMs: TTL_ENTITY }));
+          template = extractPageTemplate(await getHtml(c, loadPath, { ttlMs: TTL_ENTITY }));
         }
         if (!template) {
           return c.json({ error: 'Pagination is not available for this page' }, 404);
         }
-        const pageHtml = await fetchData18Html(`${template}&spage=${page}&dopage=1`, {
+        const pageHtml = await getHtml(c, `${template}&spage=${page}&dopage=1`, {
           ttlMs: TTL_ENTITY,
         });
         if (tab === 'movies') detail.movies = parseMoviesFromData18(pageHtml);
@@ -213,7 +222,7 @@ data18Router.get(
   async (c) => {
     const { slug } = c.req.valid('query');
     try {
-      const get = (sub: string) => fetchData18Html(`/name/${slug}/${sub}`, { ttlMs: TTL_ENTITY });
+      const get = (sub: string) => getHtml(c, `/name/${slug}/${sub}`, { ttlMs: TTL_ENTITY });
       const [studios, pairings, tags] = await Promise.allSettled([
         get('studios'),
         get('pairings'),
@@ -242,7 +251,7 @@ data18Router.get('/scene/:id', async (c) => {
   const id = c.req.param('id');
   if (!isValidSceneId(id)) return c.json({ error: 'Invalid scene id' }, 400);
   try {
-    const html = await fetchData18Html(`/scenes/${id}`, { ttlMs: TTL_DETAIL });
+    const html = await getHtml(c, `/scenes/${id}`, { ttlMs: TTL_DETAIL });
     cached(c, TTL_DETAIL);
     return c.json(parseSceneDetail(html, id));
   } catch (err) {
@@ -255,7 +264,7 @@ data18Router.get('/movie/:slug', async (c) => {
   const slug = c.req.param('slug');
   if (!isValidMovieSlug(slug)) return c.json({ error: 'Invalid movie id' }, 400);
   try {
-    const html = await fetchData18Html(`/movies/${slug}`, { ttlMs: TTL_DETAIL });
+    const html = await getHtml(c, `/movies/${slug}`, { ttlMs: TTL_DETAIL });
     cached(c, TTL_DETAIL);
     return c.json(parseMovieDetail(html, slug));
   } catch (err) {
