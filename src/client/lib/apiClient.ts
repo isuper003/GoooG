@@ -7,6 +7,7 @@ import type {
   GameAnswerResponse,
   StatsOverview,
   ConfusedPair,
+  ReviewQueuesDTO,
 } from '../../shared/types';
 import type {
   GameSessionCreateInput,
@@ -83,6 +84,8 @@ export const apiClient = {
   getCategories: () => request<CategoryDTO[]>('/api/categories'),
 
   getHomePreviews: () => request<HomePreviewsDTO>('/api/home-previews'),
+
+  getReviewQueues: () => request<ReviewQueuesDTO>('/api/review/queues'),
 
   getCharacters: (params: CharacterListParams = {}) => {
     const search = new URLSearchParams();

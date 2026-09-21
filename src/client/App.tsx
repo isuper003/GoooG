@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Link } from 'react-router-dom';
 import { useCharacters } from './hooks/useCharacters';
+import { useReviewQueues } from './hooks/useReview';
 import FullscreenButton from './components/ui/FullscreenButton';
 import RandomShowcaseModal from './components/showcase/RandomShowcaseModal';
 
@@ -14,7 +15,9 @@ const navItems = [
 
 export default function App() {
   const { data: characters = [] } = useCharacters({});
+  const { data: reviewQueues } = useReviewQueues();
   const activeCount = characters.filter((c) => c.isActive).length;
+  const dueCount = reviewQueues?.due?.count ?? 0;
   const [isRandomOpen, setIsRandomOpen] = useState(false);
 
   useEffect(() => {
@@ -58,7 +61,14 @@ export default function App() {
                   }`
                 }
               >
-                {item.label}
+                <>
+                  {item.label}
+                  {item.to === '/play' && dueCount > 0 && (
+                    <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 border border-cyan-400/30 text-[10px] font-mono font-bold leading-none">
+                      {dueCount}
+                    </span>
+                  )}
+                </>
               </NavLink>
             ))}
           </nav>

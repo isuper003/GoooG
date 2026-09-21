@@ -16,6 +16,7 @@ import {
 import type { GameSessionPoolCharacter } from '../../shared/types';
 import type { GameAnswerInput } from '../../shared/validation';
 import { apiClient } from '../lib/apiClient';
+import { queryClient } from '../lib/queryClient';
 import { toProxiedImageUrl } from '../lib/imageUrl';
 
 export type GameMode = 'classic' | 'match';
@@ -364,6 +365,10 @@ export function useGameSession(input: UseGameSessionInput) {
         totalCorrect: summary.totalCorrect,
         totalWrong: summary.totalWrong,
         remediationRoundsPlayed: summary.remediationRoundsPlayed,
+      })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['review'] });
+        queryClient.invalidateQueries({ queryKey: ['stats'] });
       })
       .catch((err) => console.warn('[useGameSession] finish session failed', err));
   }

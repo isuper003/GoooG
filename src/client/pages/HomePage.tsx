@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import CategoryCard from '../components/home/CategoryCard';
 import GameSetupModal from '../components/home/GameSetupModal';
+import TodayTasksBar from '../components/home/TodayTasksBar';
 import { apiClient } from '../lib/apiClient';
 import { useCharacters } from '../hooks/useCharacters';
 import { toProxiedImageUrl } from '../lib/imageUrl';
@@ -355,6 +356,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Today Spaced Repetition Tasks */}
+      <TodayTasksBar />
 
       {/* ======================================================== */}
       {/* INVESTIGATION ARCHIVES // CATEGORY DECKS                 */}
