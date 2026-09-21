@@ -5,6 +5,8 @@ import GamePage from './pages/GamePage';
 import GalleryPage from './pages/GalleryPage';
 import StatsPage from './pages/StatsPage';
 import ImportPage from './pages/ImportPage';
+import Data18Page from './pages/Data18Page';
+import { Data18MoviePage, Data18ScenePage } from './pages/Data18DetailPage';
 
 export function AppRouter() {
   return (
@@ -16,6 +18,9 @@ export function AppRouter() {
           <Route path="gallery" element={<GalleryPage />} />
           <Route path="stats" element={<StatsPage />} />
           <Route path="import" element={<ImportPage />} />
+          <Route path="data18" element={<Data18Page />} />
+          <Route path="data18/scene/:id" element={<Data18ScenePage />} />
+          <Route path="data18/movie/:slug" element={<Data18MoviePage />} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -22,6 +22,7 @@ const NAV_ICONS: Record<string, string> = {
   '/gallery': '🖼️',
   '/import': '📷',
   '/stats': '📊',
+  '/data18': '🎬',
 };
 
 export default function MobileNavDrawer({
