@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import type { CharacterSort } from '../lib/apiClient';
-import { useStatsOverview } from '../hooks/useStats';
+import { useStatsOverview, useConfusions } from '../hooks/useStats';
 import { useCharacters } from '../hooks/useCharacters';
 import OverviewCards from '../components/stats/OverviewCards';
 import CategoryAccuracyChart from '../components/stats/CategoryAccuracyChart';
 import SrsDistributionChart from '../components/stats/SrsDistributionChart';
+import ConfusedPairsList from '../components/stats/ConfusedPairsList';
 import CharacterStatsTable from '../components/stats/CharacterStatsTable';
 
 export default function StatsPage() {
   const [sort, setSort] = useState<CharacterSort>('weakest');
   const { data: overview, isLoading: overviewLoading } = useStatsOverview();
   const { data: characters = [], isLoading: charactersLoading } = useCharacters({ sort });
+  const { data: confusions = [] } = useConfusions();
 
   const isLoading = overviewLoading || charactersLoading;
 
@@ -45,6 +47,8 @@ export default function StatsPage() {
             <CategoryAccuracyChart byCategory={overview.byCategory} />
             <SrsDistributionChart characters={characters} />
           </div>
+
+          <ConfusedPairsList pairs={confusions} />
 
           <CharacterStatsTable characters={characters} sort={sort} onSortChange={setSort} />
         </>

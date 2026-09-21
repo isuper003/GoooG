@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { useGameSession, type GameMode } from '../hooks/useGameSession';
 import type { GameSessionPoolCharacter } from '../../shared/types';
+import type { ConfusionEntry } from '../../shared/srs';
 import ClassicRound from '../components/game/ClassicRound';
 import MatchRound from '../components/game/MatchRound';
 import ResultsScreen from '../components/game/ResultsScreen';
@@ -17,6 +18,7 @@ interface GameLocationState {
   plannedRounds: number | null;
   scope: string;
   focusIds?: number[] | null;
+  confusion?: Record<number, ConfusionEntry[]> | null;
   latencyBaseline?: {
     classic: number | null;
     match: number | null;
@@ -70,6 +72,7 @@ function ActiveGame({ state }: { state: GameLocationState }) {
     mode: state.mode,
     plannedRounds: state.plannedRounds,
     focusIds: state.focusIds,
+    confusion: state.confusion,
     latencyBaseline: state.latencyBaseline,
   });
   const [confirmingEnd, setConfirmingEnd] = useState(false);

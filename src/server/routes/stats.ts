@@ -1,7 +1,15 @@
 import { Hono } from 'hono';
 import { queryAll, queryOne } from '../db';
-import type { StatsOverview, CategoryStats } from '../../shared/types';
+import type { StatsOverview, CategoryStats, ConfusedPair } from '../../shared/types';
 import type { AppEnv } from '../app';
+
+interface ConfusedPairRow {
+  target_id: number;
+  target_name: string;
+  selected_id: number;
+  selected_name: string;
+  n: number;
+}
 
 interface SessionsStatsRow {
   games_played: number;
@@ -97,6 +105,47 @@ statsRouter.get('/overview', async (c) => {
     masteredCharacters: Number(characterKpis?.mastered_characters || 0),
     strugglingCharacters: Number(characterKpis?.struggling_characters || 0),
   };
+
+  return c.json(response);
+});
+
+// GET /api/stats/confusions
+statsRouter.get('/confusions', async (c) => {
+  const rawLimit = c.req.query('limit');
+  let limit = 20;
+  if (rawLimit !== undefined) {
+    const parsed = parseInt(rawLimit, 10);
+    if (!Number.isNaN(parsed)) {
+      limit = Math.min(50, Math.max(1, parsed));
+    }
+  }
+
+  const rows = await queryAll<ConfusedPairRow>(
+    c.env.DB,
+    `SELECT a.character_id AS target_id, t.name AS target_name,
+            a.selected_character_id AS selected_id, sc.name AS selected_name,
+            COUNT(*) AS n
+     FROM game_answers a
+     JOIN game_sessions s ON s.id = a.session_id
+     JOIN characters t  ON t.id  = a.character_id
+     JOIN characters sc ON sc.id = a.selected_character_id
+     WHERE a.is_correct = 0
+       AND a.selected_character_id IS NOT NULL
+       AND s.mode = 'classic'
+     GROUP BY a.character_id, a.selected_character_id
+     HAVING COUNT(*) >= 2
+     ORDER BY n DESC
+     LIMIT ?`,
+    limit
+  );
+
+  const response: ConfusedPair[] = rows.map((r) => ({
+    targetId: Number(r.target_id),
+    targetName: r.target_name,
+    selectedId: Number(r.selected_id),
+    selectedName: r.selected_name,
+    count: Number(r.n),
+  }));
 
   return c.json(response);
 });

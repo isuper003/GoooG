@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   createRoundPicker,
-  pickDistractors,
+  pickDistractorsWeighted,
+  CONFUSION_BIAS,
   createRemediationTracker,
   deriveFluencyThresholds,
   classifyFluency,
@@ -10,6 +11,7 @@ import {
   MIN_LATENCY_SAMPLES,
   type RemediationTracker,
   type Fluency,
+  type ConfusionEntry,
 } from '../../shared/srs';
 import type { GameSessionPoolCharacter } from '../../shared/types';
 import type { GameAnswerInput } from '../../shared/validation';
@@ -32,6 +34,7 @@ export interface UseGameSessionInput {
   mode: GameMode;
   plannedRounds: number | null;
   focusIds?: number[] | null;
+  confusion?: Record<number, ConfusionEntry[]> | null;
   latencyBaseline?: {
     classic: number | null;
     match: number | null;
@@ -148,16 +151,25 @@ function preloadRound(round: RoundData): Promise<void> {
 function buildRoundData(
   targetId: number,
   mode: GameMode,
-  liveChars: Map<number, LiveCharacter>
+  liveChars: Map<number, LiveCharacter>,
+  confusion?: Record<number, ConfusionEntry[]> | null
 ): RoundData {
   const target = liveChars.get(targetId);
   if (!target) {
     throw new Error(`buildRoundData: character ${targetId} not found in pool`);
   }
   const allChars = Array.from(liveChars.values());
+  const confusionFor = (id: number): ConfusionEntry[] => confusion?.[id] ?? [];
 
   if (mode === 'classic') {
-    const distractors = pickDistractors(allChars, target, 2);
+    const distractors = pickDistractorsWeighted(
+      allChars,
+      target,
+      2,
+      confusionFor(target.id),
+      Math.random,
+      CONFUSION_BIAS.classic
+    );
     const options = shuffle([
       { characterId: target.id, name: target.name },
       ...distractors.map((d) => ({ characterId: d.id, name: d.name })),
@@ -170,7 +182,17 @@ function buildRoundData(
     };
   }
 
-  const [distractor] = pickDistractors(allChars, target, 1);
+  const [distractor] = pickDistractorsWeighted(
+    allChars,
+    target,
+    1,
+    confusionFor(target.id),
+    Math.random,
+    CONFUSION_BIAS.match
+  );
+  if (!distractor) {
+    throw new Error(`buildRoundData: failed to pick match distractor for character ${targetId}`);
+  }
   const tiles = shuffle([
     { characterId: target.id, imageUrl: pickRandomImage(target.images) },
     { characterId: distractor.id, imageUrl: pickRandomImage(distractor.images) },
@@ -232,7 +254,12 @@ export function useGameSession(input: UseGameSessionInput) {
     initializedRef.current = true;
 
     const firstTargetId = pickerRef.current.next().id;
-    const firstRound = buildRoundData(firstTargetId, input.mode, liveCharsRef.current);
+    const firstRound = buildRoundData(
+      firstTargetId,
+      input.mode,
+      liveCharsRef.current,
+      input.confusion
+    );
     setCurrentRound(firstRound);
     setStatus('playing');
     void preloadRound(firstRound);
@@ -364,7 +391,7 @@ export function useGameSession(input: UseGameSessionInput) {
       return;
     }
     const nextId = pickerRef.current.next().id;
-    const next = buildRoundData(nextId, input.mode, liveCharsRef.current);
+    const next = buildRoundData(nextId, input.mode, liveCharsRef.current, input.confusion);
     await Promise.all([wait(FEEDBACK_MS), preloadRound(next)]);
     setCurrentRound(next);
     setSelectedCharacterId(null);
@@ -385,7 +412,7 @@ export function useGameSession(input: UseGameSessionInput) {
       finalizeSession();
       return;
     }
-    const next = buildRoundData(nextId, input.mode, liveCharsRef.current);
+    const next = buildRoundData(nextId, input.mode, liveCharsRef.current, input.confusion);
     await Promise.all([wait(FEEDBACK_MS), preloadRound(next)]);
     setCurrentRound(next);
     setSelectedCharacterId(null);
@@ -508,7 +535,7 @@ export function useGameSession(input: UseGameSessionInput) {
       finalizeSession();
       return;
     }
-    const round = buildRoundData(nextId, input.mode, liveCharsRef.current);
+    const round = buildRoundData(nextId, input.mode, liveCharsRef.current, input.confusion);
     setCurrentRound(round);
     setSelectedCharacterId(null);
     setStatus('remediationPlaying');

@@ -6,6 +6,7 @@ import type {
   GameSessionCreateResponse,
   GameAnswerResponse,
   StatsOverview,
+  ConfusedPair,
 } from '../../shared/types';
 import type {
   GameSessionCreateInput,
@@ -125,6 +126,11 @@ export const apiClient = {
   deleteLabel: (id: number) => request<{ ok: boolean }>(`/api/labels/${id}`, { method: 'DELETE' }),
 
   getStatsOverview: () => request<StatsOverview>('/api/stats/overview'),
+
+  getConfusions: (limit?: number) => {
+    const qs = limit !== undefined ? `?limit=${encodeURIComponent(limit)}` : '';
+    return request<ConfusedPair[]>(`/api/stats/confusions${qs}`);
+  },
 
   createGameSession: (body: GameSessionCreateInput) =>
     request<GameSessionCreateResponse>('/api/game-sessions', {

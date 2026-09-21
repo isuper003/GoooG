@@ -17,11 +17,18 @@ import {
   nextIntervalHours,
   computeNextReviewAt,
   leechTransition,
+  type ConfusionEntry,
 } from '../../shared/srs';
 import type { AppEnv } from '../app';
 
 interface IdRow {
   id: number;
+}
+
+interface ConfusionRow {
+  target_id: number;
+  selected_id: number;
+  n: number;
 }
 
 interface LatencyRow {
@@ -371,15 +378,29 @@ sessionsRouter.post('/', zValidator('json', gameSessionCreateSchema), async (c) 
     return c.json({ error: 'failed_to_create_session' }, 500);
   }
 
-  const latencyRows = await queryAll<LatencyRow>(
-    c.env.DB,
-    `SELECT s.mode AS mode, a.elapsed_ms AS elapsed_ms
-     FROM game_answers a
-     JOIN game_sessions s ON s.id = a.session_id
-     WHERE a.phase = 'main' AND a.elapsed_ms IS NOT NULL
-     ORDER BY a.answered_at DESC
-     LIMIT 400`
-  );
+  const [latencyRows, confusionRows] = await Promise.all([
+    queryAll<LatencyRow>(
+      c.env.DB,
+      `SELECT s.mode AS mode, a.elapsed_ms AS elapsed_ms
+       FROM game_answers a
+       JOIN game_sessions s ON s.id = a.session_id
+       WHERE a.phase = 'main' AND a.elapsed_ms IS NOT NULL
+       ORDER BY a.answered_at DESC
+       LIMIT 400`
+    ),
+    queryAll<ConfusionRow>(
+      c.env.DB,
+      `SELECT a.character_id AS target_id,
+              a.selected_character_id AS selected_id,
+              COUNT(*) AS n
+       FROM game_answers a
+       JOIN game_sessions s ON s.id = a.session_id
+       WHERE a.is_correct = 0
+         AND a.selected_character_id IS NOT NULL
+         AND s.mode = 'classic'
+       GROUP BY a.character_id, a.selected_character_id`
+    ),
+  ]);
 
   const classicSamples: number[] = [];
   const matchSamples: number[] = [];
@@ -391,10 +412,34 @@ sessionsRouter.post('/', zValidator('json', gameSessionCreateSchema), async (c) 
     }
   }
 
+  const poolIdSet = new Set(pool.map((char) => char.id));
+  const partnersByTarget = new Map<number, ConfusionEntry[]>();
+
+  for (const row of confusionRows) {
+    const targetId = Number(row.target_id);
+    const selectedId = Number(row.selected_id);
+    const count = Number(row.n);
+    if (poolIdSet.has(targetId) && poolIdSet.has(selectedId)) {
+      const list = partnersByTarget.get(targetId) ?? [];
+      list.push({ id: selectedId, count });
+      partnersByTarget.set(targetId, list);
+    }
+  }
+
+  const confusion: Record<number, ConfusionEntry[]> = {};
+  for (const [targetId, partners] of partnersByTarget.entries()) {
+    partners.sort((a, b) => b.count - a.count);
+    const top3 = partners.slice(0, 3);
+    if (top3.length > 0) {
+      confusion[targetId] = top3;
+    }
+  }
+
   const response: GameSessionCreateResponse = {
     sessionId: sessionRow.id,
     pool,
     focusIds,
+    ...(Object.keys(confusion).length > 0 ? { confusion } : {}),
     latencyBaseline: {
       classic: medianMs(classicSamples),
       match: medianMs(matchSamples),
