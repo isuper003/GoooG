@@ -70,6 +70,26 @@ describe('Data18 Parsers (synthetic markup)', () => {
       expect(parseScenesFromData18(html)[0].imageUrl).toBe('https://cdn.dt18.com/media/t/3/scenes/1/0/1.jpg');
     });
 
+    it('parses scenes whose links carry a title slug after the id', () => {
+      const html = `
+        <div id="item3">
+          <a href="https://www.data18.com/scenes/3137398-a-messy-detention#trailer" title="play scene trailer">t</a>
+          <a href="https://www.data18.com/scenes/3137398-a-messy-detention#image1901" title="31 pictures/videostills">31</a>
+          <a href="https://www.data18.com/scenes/3137398-a-messy-detention" title="A Messy Detention"><img class="yborder" src="https://cdn.dt18.com/media/t/3/scenes/3/6/137398.jpg" alt="A Messy Detention" /></a>
+          <a href="https://www.data18.com/scenes/3137398-a-messy-detention" class="gen12 bold">A Messy Detention</a>
+          <p>Cast: <a href="https://www.data18.com/name/coco-lovelock">Coco&nbsp;Lovelock</a></p>
+          <p>Studio: <a href="https://www.data18.com/studios/pure-taboo">Pure Taboo</a></p>
+        </div>`;
+      const [scene] = parseScenesFromData18(html);
+      expect(scene).toMatchObject({
+        id: '3137398',
+        url: 'https://www.data18.com/scenes/3137398-a-messy-detention',
+        title: 'A Messy Detention',
+        imageUrl: 'https://cdn.dt18.com/media/t/3/scenes/3/6/137398.jpg',
+      });
+      expect(scene.cast[0].slug).toBe('coco-lovelock');
+    });
+
     it('does not return an empty string as the date', () => {
       const html = `
         <div id="item1">

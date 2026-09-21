@@ -126,7 +126,7 @@ export function parseScenesFromData18(html: string): Data18Scene[] {
 
   for (let i = 1; i < chunks.length; i++) {
     const chunk = chunks[i];
-    const linkMatch = chunk.match(/href="(https:\/\/www\.data18\.com\/scenes\/(\d+))[#"]/i);
+    const linkMatch = chunk.match(/href="(https:\/\/www\.data18\.com\/scenes\/(\d+)(?:-[^"#?]*)?)[#"]/i);
     if (!linkMatch) continue;
     const id = linkMatch[2];
     if (seen.has(id)) continue;
@@ -527,7 +527,7 @@ export function parseSceneDetail(html: string, id: string): Data18SceneDetail {
   const zone = zoneStart >= 0 ? html.slice(zoneStart) : '';
   // `(?:(?!<\/a>)[\s\S])*?` keeps each match inside a single anchor.
   const sibRe =
-    /<a href="https:\/\/www\.data18\.com\/scenes\/(\d+)"[^>]*title="([^"]*)">(?:(?!<\/a>)[\s\S])*?<b>(Scene \d+)<\/b>(?:(?!<\/a>)[\s\S])*?<img[^>]*src="([^"]+)"/gi;
+    /<a href="https:\/\/www\.data18\.com\/scenes\/(\d+)(?:-[^"#?]*)?"[^>]*title="([^"]*)">(?:(?!<\/a>)[\s\S])*?<b>(Scene \d+)<\/b>(?:(?!<\/a>)[\s\S])*?<img[^>]*src="([^"]+)"/gi;
   for (const m of zone.matchAll(sibRe)) {
     siblingScenes.push({
       id: m[1],
@@ -591,7 +591,7 @@ export function parseMovieDetail(html: string, slug: string): Data18MovieDetail 
 
   const scenes: Data18MovieDetail['scenes'] = [];
   const sceneRe =
-    /<a href="https:\/\/www\.data18\.com\/scenes\/(\d+)"[^>]*>\s*<img[^>]*>[\s\S]*?<b>Scene #(\d+)<\/b>[\s\S]*?<p style="margin-top: 4px;">([^<]*)<\/p>/gi;
+    /<a href="https:\/\/www\.data18\.com\/scenes\/(\d+)(?:-[^"#?]*)?"[^>]*>\s*<img[^>]*>[\s\S]*?<b>Scene #(\d+)<\/b>[\s\S]*?<p style="margin-top: 4px;">([^<]*)<\/p>/gi;
   for (const m of html.matchAll(sceneRe)) {
     const imgTag = m[0].match(/<img\b[^>]*>/i)?.[0] ?? '';
     scenes.push({
