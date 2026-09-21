@@ -12,6 +12,7 @@ const navItems = [
   { to: '/gallery', label: 'Gallery' },
   { to: '/import', label: 'Photo Studio' },
   { to: '/stats', label: 'Stats' },
+  { to: '/data18', label: 'Data18 🎬' },
 ];
 
 export default function App() {

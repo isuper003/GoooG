@@ -11,6 +11,16 @@ import type {
   HeatmapResponse,
 } from '../../shared/types';
 import type {
+  Data18ScenesResponse,
+  Data18MoviesResponse,
+  Data18SearchResponse,
+  Data18EntityDetail,
+  Data18PerformerExtra,
+  Data18SceneDetail,
+  Data18MovieDetail,
+  Data18PornPicsResult,
+} from '../../shared/data18Types';
+import type {
   GameSessionCreateInput,
   GameAnswerInput,
   GameSessionFinishInput,
@@ -173,6 +183,35 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify({ names, categoryKey, forceWeb }),
     }),
+
+  // Data18 Explorer API
+  getData18Scenes: (page = 1) =>
+    request<Data18ScenesResponse>(`/api/data18/scenes?page=${page}`),
+
+  getData18Movies: (page = 1) =>
+    request<Data18MoviesResponse>(`/api/data18/movies?page=${page}`),
+
+  searchData18: (q: string, type: 'performer' | 'studio' | 'series' | 'all' = 'all') =>
+    request<Data18SearchResponse>(
+      `/api/data18/search?q=${encodeURIComponent(q)}&type=${type}`
+    ),
+
+  getData18Entity: (path: string, page = 1, tab: 'scenes' | 'movies' = 'scenes') =>
+    request<Data18EntityDetail>(
+      `/api/data18/entity?path=${encodeURIComponent(path)}&page=${page}&tab=${tab}`
+    ),
+
+  getData18PerformerExtra: (slug: string) =>
+    request<Data18PerformerExtra>(`/api/data18/performer-extra?slug=${encodeURIComponent(slug)}`),
+
+  getData18Scene: (id: string) =>
+    request<Data18SceneDetail>(`/api/data18/scene/${encodeURIComponent(id)}`),
+
+  getData18Movie: (slug: string) =>
+    request<Data18MovieDetail>(`/api/data18/movie/${encodeURIComponent(slug)}`),
+
+  searchPornPics: (name: string) =>
+    request<Data18PornPicsResult>(`/api/data18/pornpics?name=${encodeURIComponent(name)}`),
 };
 
 interface CrawledItem {
