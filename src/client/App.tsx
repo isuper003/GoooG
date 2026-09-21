@@ -4,6 +4,7 @@ import { useCharacters } from './hooks/useCharacters';
 import { useReviewQueues } from './hooks/useReview';
 import FullscreenButton from './components/ui/FullscreenButton';
 import RandomShowcaseModal from './components/showcase/RandomShowcaseModal';
+import MobileNavDrawer from './components/ui/MobileNavDrawer';
 
 const navItems = [
   { to: '/', label: 'Spotlight' },
@@ -19,6 +20,7 @@ export default function App() {
   const activeCount = characters.filter((c) => c.isActive).length;
   const dueCount = reviewQueues?.due?.count ?? 0;
   const [isRandomOpen, setIsRandomOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleOpen = () => setIsRandomOpen(true);
@@ -46,8 +48,8 @@ export default function App() {
             </span>
           </div>
 
-          {/* Navigation Tabs */}
-          <nav className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar py-1">
+          {/* Navigation Tabs (Desktop only - hidden on mobile) */}
+          <nav className="hidden md:flex items-center gap-1 sm:gap-1.5 py-1">
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -74,8 +76,8 @@ export default function App() {
           </nav>
 
           {/* Active Performer Quick Action */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-[11px] font-mono text-white/70">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-[11px] font-mono text-white/70">
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
               <span>ROSTER: {activeCount || characters.length || 0} ACTIVE</span>
             </div>
@@ -83,19 +85,42 @@ export default function App() {
             <button
               type="button"
               onClick={() => setIsRandomOpen(true)}
-              className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] text-white/80 hover:text-white border border-white/[0.1] hover:border-cyan-400/40 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+              className="hidden sm:flex px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] text-white/80 hover:text-white border border-white/[0.1] hover:border-cyan-400/40 text-xs font-semibold transition-all items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
               title="Inspect Random Characters"
             >
               <span>🎲</span>
               <span>Random</span>
             </button>
 
+            {/* Desktop: Train Now Button */}
             <Link
               to="/play"
-              className="px-3.5 py-1.5 rounded-lg bg-cyan-400 hover:bg-white text-black font-semibold text-xs transition-colors shadow-lg shadow-cyan-400/20"
+              className="hidden md:inline-flex px-3.5 py-1.5 rounded-lg bg-cyan-400 hover:bg-white text-black font-semibold text-xs transition-colors shadow-lg shadow-cyan-400/20"
             >
               Train Now →
             </Link>
+
+            {/* Mobile: Drawer Trigger Button (Replaces Train Now on mobile) */}
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(true)}
+              aria-label="Open navigation menu"
+              className="md:hidden flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-white/10 hover:border-cyan-400/40 bg-white/[0.04] hover:bg-white/[0.1] text-white/80 hover:text-white transition-all cursor-pointer active:scale-95"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="w-4 h-4"
+              >
+                <line x1="4" y1="6" x2="20" y2="6" />
+                <line x1="4" y1="12" x2="20" y2="12" />
+                <line x1="4" y1="18" x2="20" y2="18" />
+              </svg>
+            </button>
 
             <FullscreenButton variant="header" />
           </div>
@@ -107,6 +132,16 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 flex flex-col">
         <Outlet />
       </main>
+
+      {/* Mobile Navigation Drawer */}
+      <MobileNavDrawer
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+        navItems={navItems}
+        dueCount={dueCount}
+        activeCount={activeCount}
+        onOpenRandom={() => setIsRandomOpen(true)}
+      />
 
       {/* Floating Random Showcase Overlay */}
       <RandomShowcaseModal

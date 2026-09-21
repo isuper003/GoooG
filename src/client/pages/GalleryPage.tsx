@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { CharacterDTO } from '../../shared/types';
 import type { CharacterSort } from '../lib/apiClient';
@@ -29,6 +29,10 @@ export default function GalleryPage() {
 
   const [selectedCharacterId, setSelectedCharacterId] = useState<number | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  const [zoomModalData, setZoomModalData] = useState<{
+    character: CharacterDTO;
+    photoIndex: number;
+  } | null>(null);
 
   const [trainingCategory, setTrainingCategory] = useState<
     'trans' | 'sluts' | 'twinks' | 'mix' | null
@@ -90,6 +94,52 @@ export default function GalleryPage() {
   const dossierHeroImg =
     activeDossierChar?.images?.[selectedPhotoIndex]?.url ||
     activeDossierChar?.images?.[0]?.url;
+
+  // Dossier photo navigation (scroll left/right or click)
+  const dossierImagesCount = activeDossierChar?.images.length || 0;
+  const nextDossierPhoto = useCallback(
+    (e?: React.MouseEvent | React.TouchEvent) => {
+      e?.stopPropagation();
+      if (dossierImagesCount <= 1) return;
+      setSelectedPhotoIndex((prev) => (prev + 1) % dossierImagesCount);
+    },
+    [dossierImagesCount]
+  );
+
+  const prevDossierPhoto = useCallback(
+    (e?: React.MouseEvent | React.TouchEvent) => {
+      e?.stopPropagation();
+      if (dossierImagesCount <= 1) return;
+      setSelectedPhotoIndex((prev) => (prev - 1 + dossierImagesCount) % dossierImagesCount);
+    },
+    [dossierImagesCount]
+  );
+
+  const dossierTouchStartX = useRef<number | null>(null);
+  const handleDossierTouchStart = (e: React.TouchEvent) => {
+    dossierTouchStartX.current = e.touches[0].clientX;
+  };
+  const handleDossierTouchEnd = (e: React.TouchEvent) => {
+    if (dossierTouchStartX.current === null) return;
+    const diffX = dossierTouchStartX.current - e.changedTouches[0].clientX;
+    if (diffX > 30) nextDossierPhoto(e);
+    else if (diffX < -30) prevDossierPhoto(e);
+    dossierTouchStartX.current = null;
+  };
+
+  const lastDossierScrollTime = useRef(0);
+  const handleDossierWheel = (e: React.WheelEvent) => {
+    if (dossierImagesCount <= 1) return;
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (Math.abs(delta) > 18) {
+      const now = Date.now();
+      if (now - lastDossierScrollTime.current > 260) {
+        lastDossierScrollTime.current = now;
+        if (delta > 0) nextDossierPhoto();
+        else prevDossierPhoto();
+      }
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6 w-full pb-10">
@@ -290,6 +340,9 @@ export default function GalleryPage() {
                 character={char}
                 isSelected={char.id === activeDossierChar?.id}
                 onSelect={() => setSelectedCharacterId(char.id)}
+                onZoom={(character, photoIndex) =>
+                  setZoomModalData({ character, photoIndex })
+                }
                 onEdit={() => setEditingCharacter(char)}
                 onViewImages={() => setViewingImagesFor(char)}
                 onDelete={() => setDeletingCharacter(char)}
@@ -305,7 +358,16 @@ export default function GalleryPage() {
             <div className="lg:col-span-4 hairline-card rounded-3xl p-6 flex flex-col justify-between sticky top-20 shadow-2xl border border-white/15 bg-[#090d14]">
               <div>
                 {/* Large Selected Performer Portrait */}
-                <div className="relative aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-xl group">
+                <div
+                  className="relative aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-xl group cursor-zoom-in select-none"
+                  onClick={() =>
+                    setZoomModalData({ character: activeDossierChar, photoIndex: selectedPhotoIndex })
+                  }
+                  onTouchStart={handleDossierTouchStart}
+                  onTouchEnd={handleDossierTouchEnd}
+                  onWheel={handleDossierWheel}
+                  title="Click to Zoom-in • Scroll or swipe to switch photos"
+                >
                   {dossierHeroImg ? (
                     <img
                       src={toProxiedImageUrl(dossierHeroImg)}
@@ -323,18 +385,41 @@ export default function GalleryPage() {
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent pointer-events-none" />
 
-                  <button
-                    type="button"
-                    onClick={() => setViewingImagesFor(activeDossierChar)}
-                    className="absolute top-3 right-3 bg-black/70 hover:bg-white text-white hover:text-black px-2.5 py-1.5 rounded-xl border border-white/20 backdrop-blur-md text-xs font-mono transition-colors cursor-pointer"
-                  >
-                    Full Res ↗
-                  </button>
+                  {/* Left / Right Hero Scroll Arrows */}
+                  {dossierImagesCount > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={prevDossierPhoto}
+                        aria-label="Previous photo"
+                        className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-10 backdrop-blur-sm text-sm border border-white/20 hover:border-cyan-400 cursor-pointer shadow-lg active:scale-95"
+                      >
+                        ‹
+                      </button>
+                      <button
+                        type="button"
+                        onClick={nextDossierPhoto}
+                        aria-label="Next photo"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-10 backdrop-blur-sm text-sm border border-white/20 hover:border-cyan-400 cursor-pointer shadow-lg active:scale-95"
+                      >
+                        ›
+                      </button>
+                    </>
+                  )}
+
+                  
 
                   <div className="absolute bottom-3 inset-x-3 pointer-events-none">
-                    <span className="text-[10px] font-mono uppercase bg-white/15 text-cyan-300 px-2.5 py-0.5 rounded-full border border-white/20 backdrop-blur-md">
-                      {activeDossierChar.categoryKey} Deck
-                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono uppercase bg-white/15 text-cyan-300 px-2.5 py-0.5 rounded-full border border-white/20 backdrop-blur-md">
+                        {activeDossierChar.categoryKey} Deck
+                      </span>
+                      {dossierImagesCount > 1 && (
+                        <span className="text-[10px] font-mono text-white/70 bg-black/70 px-2 py-0.5 rounded-full border border-white/15 backdrop-blur-md">
+                          {selectedPhotoIndex + 1} / {dossierImagesCount}
+                        </span>
+                      )}
+                    </div>
                     <h2 className="text-2xl font-display font-black text-white mt-1 drop-shadow-md truncate">
                       {activeDossierChar.name}
                     </h2>
@@ -495,13 +580,17 @@ export default function GalleryPage() {
                   return (
                     <tr key={char.id} className="hover:bg-white/[0.03] transition-colors">
                       <td className="p-4 flex items-center gap-3">
-                        <div className="w-10 h-13 rounded-lg overflow-hidden bg-black border border-white/10 shrink-0">
+                        <div
+                          onClick={() => setZoomModalData({ character: char, photoIndex: 0 })}
+                          className="w-10 h-13 rounded-lg overflow-hidden bg-black border border-white/10 shrink-0 cursor-zoom-in group/thumb relative shadow-sm"
+                          title="Click to Zoom-in"
+                        >
                           {thumb ? (
                             <img
                               src={toProxiedImageUrl(thumb)}
                               alt=""
                               referrerPolicy="no-referrer"
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover transition-transform group-hover/thumb:scale-110"
                             />
                           ) : null}
                         </div>
@@ -579,10 +668,23 @@ export default function GalleryPage() {
         />
       )}
 
+      {/* Floating Zoom-In Modal */}
+      {zoomModalData && (
+        <ImageLightbox
+          images={zoomModalData.character.images.map((img) => img.url)}
+          characterName={zoomModalData.character.name}
+          categoryKey={zoomModalData.character.categoryKey}
+          initialIndex={zoomModalData.photoIndex}
+          onClose={() => setZoomModalData(null)}
+        />
+      )}
+
       {viewingImagesFor && (
         <ImageLightbox
           images={viewingImagesFor.images.map((img) => img.url)}
           characterName={viewingImagesFor.name}
+          categoryKey={viewingImagesFor.categoryKey}
+          initialIndex={0}
           onClose={() => setViewingImagesFor(null)}
         />
       )}
