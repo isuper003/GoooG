@@ -36,11 +36,13 @@ import {
   topBy,
 } from '../lib/data18Parsers';
 import { extractGalleryCards, extractProfileGallery, slugifyName } from './crawler';
+import { data18FavoritesRouter } from './data18Favorites';
 
 // Re-exported so the parsers can be unit-tested through this module.
 export * from '../lib/data18Parsers';
 
 export const data18Router = new Hono<AppEnv>();
+data18Router.route('/', data18FavoritesRouter);
 
 const TTL_LISTING = 5 * 60_000;
 const TTL_ENTITY = 15 * 60_000;

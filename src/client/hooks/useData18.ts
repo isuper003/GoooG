@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
 
 const STALE = 5 * 60_000;
@@ -70,5 +70,48 @@ export function usePornPicsSearch(name: string, enabled: boolean) {
     queryFn: () => apiClient.searchPornPics(name),
     staleTime: 30 * 60_000,
     enabled: enabled && name.trim().length >= 2,
+  });
+}
+
+export function useData18Favorites() {
+  return useQuery({
+    queryKey: ['data18', 'favorites'],
+    queryFn: () => apiClient.getData18Favorites().then((r) => r.favorites),
+    staleTime: 60_000,
+  });
+}
+
+/** Follows or unfollows an entity, then refreshes the favorites list and the feed. */
+export function useToggleData18Favorite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ path, follow }: { path: string; follow: boolean }): Promise<void> => {
+      if (follow) await apiClient.addData18Favorite(path);
+      else await apiClient.removeData18Favorite(path);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['data18', 'favorites'] });
+      qc.invalidateQueries({ queryKey: ['data18', 'feed'] });
+    },
+  });
+}
+
+export function useData18Feed(enabled = true) {
+  return useQuery({
+    queryKey: ['data18', 'feed'],
+    queryFn: () => apiClient.getData18Feed(),
+    staleTime: 5 * 60_000,
+    enabled,
+  });
+}
+
+export function useMarkData18Seen() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (items: { path: string; sceneId: string }[]) => apiClient.markData18Seen(items),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['data18', 'feed'] });
+      qc.invalidateQueries({ queryKey: ['data18', 'favorites'] });
+    },
   });
 }

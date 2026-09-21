@@ -7,12 +7,13 @@ import SceneCard from '../components/data18/SceneCard';
 import MovieCard from '../components/data18/MovieCard';
 import EntitySearchBar from '../components/data18/EntitySearchBar';
 import EntityDetailView from '../components/data18/EntityDetailView';
+import FollowingFeed from '../components/data18/FollowingFeed';
 import Pager from '../components/data18/Pager';
 import ImageLightbox from '../components/gallery/ImageLightbox';
 
-type Data18Mode = 'scenes' | 'movies' | 'performers' | 'studios';
+type Data18Mode = 'scenes' | 'movies' | 'performers' | 'studios' | 'following';
 
-const MODES: Data18Mode[] = ['scenes', 'movies', 'performers', 'studios'];
+const MODES: Data18Mode[] = ['scenes', 'movies', 'performers', 'studios', 'following'];
 
 const POPULAR_PERFORMERS = [
   { name: 'Cory Chase', slug: 'cory-chase' },
@@ -127,6 +128,7 @@ export default function Data18Page() {
               ['movies', '📼', 'Latest Movies', 'bg-amber-400 text-black shadow-md shadow-amber-400/20'],
               ['performers', '⭐', 'By Performer', 'bg-white text-black shadow-md'],
               ['studios', '🏢', 'By Studio / Series', 'bg-rose-400 text-black shadow-md'],
+              ['following', '💜', 'Following', 'bg-violet-400 text-black shadow-md'],
             ] as const
           ).map(([key, icon, label, activeClass]) => (
             <button
@@ -267,6 +269,8 @@ export default function Data18Page() {
             </div>
           ) : null}
         </div>
+      ) : mode === 'following' ? (
+        <FollowingFeed onZoomImage={setLightboxImage} />
       ) : mode === 'performers' ? (
         <div className="space-y-8">
           <div className="flex flex-col items-center text-center gap-3 pt-4">

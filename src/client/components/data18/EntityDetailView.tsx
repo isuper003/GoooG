@@ -8,6 +8,7 @@ import PerformerAvatar from './PerformerAvatar';
 import PerformerExtraPanel from './PerformerExtraPanel';
 import PornPicsPanel from './PornPicsPanel';
 import AddToCharactersModal from './AddToCharactersModal';
+import FavoriteButton from './FavoriteButton';
 
 interface EntityDetailViewProps {
   entity: Data18EntityDetail;
@@ -130,6 +131,7 @@ export default function EntityDetailView({
               >
                 Data18 ↗
               </a>
+              <FavoriteButton path={entity.path} />
               {entity.type === 'performer' ? (
                 <button
                   type="button"
