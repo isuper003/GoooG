@@ -16,6 +16,13 @@ interface GameLocationState {
   mode: GameMode;
   plannedRounds: number | null;
   scope: string;
+  focusIds?: number[] | null;
+  latencyBaseline?: {
+    classic: number | null;
+    match: number | null;
+    classicSamples: number;
+    matchSamples: number;
+  } | null;
 }
 
 function isGameLocationState(state: unknown): state is GameLocationState {
@@ -62,6 +69,8 @@ function ActiveGame({ state }: { state: GameLocationState }) {
     pool: state.pool,
     mode: state.mode,
     plannedRounds: state.plannedRounds,
+    focusIds: state.focusIds,
+    latencyBaseline: state.latencyBaseline,
   });
   const [confirmingEnd, setConfirmingEnd] = useState(false);
 

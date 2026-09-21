@@ -12,10 +12,31 @@ import type {
   GameSessionCreateResponse,
   GameAnswerResponse,
 } from '../../shared/types';
+import {
+  medianMs,
+  nextIntervalHours,
+  computeNextReviewAt,
+  leechTransition,
+} from '../../shared/srs';
 import type { AppEnv } from '../app';
 
 interface IdRow {
   id: number;
+}
+
+interface LatencyRow {
+  mode: string;
+  elapsed_ms: number;
+}
+
+interface CharacterSnapshotRow {
+  id: number;
+  srs_level: number;
+  correct_count: number;
+  wrong_count: number;
+  interval_hours: number | null;
+  is_leech: number;
+  leech_streak: number;
 }
 
 interface CharacterPoolRow {
@@ -350,10 +371,36 @@ sessionsRouter.post('/', zValidator('json', gameSessionCreateSchema), async (c) 
     return c.json({ error: 'failed_to_create_session' }, 500);
   }
 
+  const latencyRows = await queryAll<LatencyRow>(
+    c.env.DB,
+    `SELECT s.mode AS mode, a.elapsed_ms AS elapsed_ms
+     FROM game_answers a
+     JOIN game_sessions s ON s.id = a.session_id
+     WHERE a.phase = 'main' AND a.elapsed_ms IS NOT NULL
+     ORDER BY a.answered_at DESC
+     LIMIT 400`
+  );
+
+  const classicSamples: number[] = [];
+  const matchSamples: number[] = [];
+  for (const row of latencyRows) {
+    if (row.mode === 'classic' && classicSamples.length < 50) {
+      classicSamples.push(row.elapsed_ms);
+    } else if (row.mode === 'match' && matchSamples.length < 50) {
+      matchSamples.push(row.elapsed_ms);
+    }
+  }
+
   const response: GameSessionCreateResponse = {
     sessionId: sessionRow.id,
     pool,
     focusIds,
+    latencyBaseline: {
+      classic: medianMs(classicSamples),
+      match: medianMs(matchSamples),
+      classicSamples: classicSamples.length,
+      matchSamples: matchSamples.length,
+    },
   };
 
   return c.json(response, 201);
@@ -379,9 +426,10 @@ sessionsRouter.post('/:id/answers', zValidator('json', gameAnswerSchema), async 
   const body = c.req.valid('json');
 
   // Check if character exists
-  const character = await queryOne<{ id: number }>(
+  const character = await queryOne<CharacterSnapshotRow>(
     c.env.DB,
-    'SELECT id FROM characters WHERE id = ?',
+    `SELECT id, srs_level, correct_count, wrong_count, interval_hours, is_leech, leech_streak
+     FROM characters WHERE id = ?`,
     body.characterId
   );
   if (!character) {
@@ -391,8 +439,9 @@ sessionsRouter.post('/:id/answers', zValidator('json', gameAnswerSchema), async 
   // Step 1: INSERT OR IGNORE into game_answers
   const insertRes = await c.env.DB.prepare(
     `INSERT OR IGNORE INTO game_answers (
-       session_id, character_id, phase, is_correct, round_index, srs_level_before, srs_level_after
-     ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+       session_id, character_id, phase, is_correct, round_index, srs_level_before, srs_level_after,
+       selected_character_id, elapsed_ms, fluency
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       sessionId,
@@ -401,25 +450,68 @@ sessionsRouter.post('/:id/answers', zValidator('json', gameAnswerSchema), async 
       body.isCorrect ? 1 : 0,
       body.roundIndex,
       body.srsLevelBefore,
-      body.srsLevelAfter
+      body.srsLevelAfter,
+      body.selectedCharacterId ?? null,
+      body.elapsedMs ?? null,
+      body.fluency ?? null
     )
     .run();
 
   // Step 2: Check meta.changes
   if (insertRes.meta.changes === 1) {
     const now = new Date().toISOString();
+
+    const projectedCorrect =
+      character.correct_count + (body.phase === 'main' && body.isCorrect ? 1 : 0);
+    const projectedWrong =
+      character.wrong_count + (body.phase === 'main' && !body.isCorrect ? 1 : 0);
+
+    const intervalHours = nextIntervalHours(
+      body.srsLevelAfter,
+      character.interval_hours,
+      body.isCorrect,
+      body.fluency ?? null
+    );
+
+    const nextReviewAt = computeNextReviewAt(now, intervalHours);
+
+    const leech = leechTransition(
+      {
+        correctCount: projectedCorrect,
+        wrongCount: projectedWrong,
+        isLeech: Boolean(character.is_leech),
+        leechStreak: character.leech_streak,
+      },
+      body.phase === 'main' ? body.isCorrect : null
+    );
+
     const updatedRow = await c.env.DB.prepare(
       `UPDATE characters
        SET correct_count = correct_count + (CASE WHEN ?1 = 'main' AND ?2 = 1 THEN 1 ELSE 0 END),
            wrong_count   = wrong_count   + (CASE WHEN ?1 = 'main' AND ?2 = 0 THEN 1 ELSE 0 END),
-           srs_level = ?3, updated_at = ?4
-       WHERE id = ?5 RETURNING correct_count, wrong_count, srs_level`
+           srs_level = ?3,
+           updated_at = ?4,
+           -- Scheduling is driven by main-phase answers only. A remediation
+           -- answer is a drill on a card the user just missed and was shown
+           -- the answer to seconds earlier, so treating it as a successful
+           -- review would defer the card by a full interval and erase the miss.
+           last_reviewed_at = CASE WHEN ?1 = 'main' THEN ?4 ELSE last_reviewed_at END,
+           interval_hours   = CASE WHEN ?1 = 'main' THEN ?5 ELSE interval_hours END,
+           next_review_at   = CASE WHEN ?1 = 'main' THEN ?6 ELSE next_review_at END,
+           leech_streak = ?7,
+           is_leech = ?8
+       WHERE id = ?9
+       RETURNING correct_count, wrong_count, srs_level`
     )
       .bind(
         body.phase,
         body.isCorrect ? 1 : 0,
         body.srsLevelAfter,
         now,
+        intervalHours,
+        nextReviewAt,
+        leech.leechStreak,
+        leech.isLeech ? 1 : 0,
         body.characterId
       )
       .first<CharacterStatsRow>();

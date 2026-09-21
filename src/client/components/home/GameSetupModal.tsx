@@ -37,6 +37,8 @@ export default function GameSetupModal({ scope, scopeLabel, onClose }: GameSetup
           mode,
           plannedRounds,
           scope,
+          focusIds: response.focusIds ?? null,
+          latencyBaseline: response.latencyBaseline ?? null,
         },
       });
     } catch (err) {

@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  srsTransition,
   createRoundPicker,
   pickDistractors,
   createRemediationTracker,
+  deriveFluencyThresholds,
+  classifyFluency,
+  applyFluencyToPromotion,
+  medianMs,
+  MIN_LATENCY_SAMPLES,
   type RemediationTracker,
+  type Fluency,
 } from '../../shared/srs';
 import type { GameSessionPoolCharacter } from '../../shared/types';
+import type { GameAnswerInput } from '../../shared/validation';
 import { apiClient } from '../lib/apiClient';
 import { toProxiedImageUrl } from '../lib/imageUrl';
 
@@ -25,6 +31,13 @@ export interface UseGameSessionInput {
   pool: GameSessionPoolCharacter[];
   mode: GameMode;
   plannedRounds: number | null;
+  focusIds?: number[] | null;
+  latencyBaseline?: {
+    classic: number | null;
+    match: number | null;
+    classicSamples: number;
+    matchSamples: number;
+  } | null;
 }
 
 interface ClassicRoundData {
@@ -60,6 +73,14 @@ export interface FinalSummary {
   totalWrong: number;
   remediationRoundsPlayed: number;
   accuracy: number;
+  fluencyBreakdown: {
+    lightning: number;
+    fluent: number;
+    hesitant: number;
+    unscored: number;
+  };
+  medianElapsedMs: number | null;
+  promotionsBlocked: number;
 }
 
 interface LiveCharacter {
@@ -75,6 +96,9 @@ interface AnswerRecord {
   phase: 'main' | 'remediation';
   isCorrect: boolean;
   roundIndex: number;
+  elapsedMs: number | null;
+  fluency: Fluency | null;
+  blocked: boolean;
 }
 
 const FEEDBACK_MS = 700;
@@ -170,7 +194,11 @@ export function useGameSession(input: UseGameSessionInput) {
   );
   const pickerRef = useRef(
     (() => {
-      const poolMembers = input.pool.map((c) => ({ id: c.id, srsLevel: c.srsLevel }));
+      const activePool =
+        input.focusIds && input.focusIds.length > 0
+          ? input.pool.filter((c) => input.focusIds?.includes(c.id))
+          : input.pool;
+      const poolMembers = activePool.map((c) => ({ id: c.id, srsLevel: c.srsLevel }));
       return createRoundPicker(poolMembers);
     })()
   );
@@ -182,6 +210,11 @@ export function useGameSession(input: UseGameSessionInput) {
   const outboxTailRef = useRef<Promise<void>>(Promise.resolve());
   const finalizedRef = useRef(false);
   const initializedRef = useRef(false);
+
+  const roundStartRef = useRef<number | null>(null);
+  const roundDiscardedRef = useRef(false);
+  const sessionSamplesRef = useRef<number[]>([]);
+  const hesitantStreakRef = useRef<Map<number, number>>(new Map());
 
   const [status, setStatus] = useState<GameStatus>('playing');
   const [currentRound, setCurrentRound] = useState<RoundData | null>(null);
@@ -206,28 +239,40 @@ export function useGameSession(input: UseGameSessionInput) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function enqueueAnswerPost(payload: {
-    phase: 'main' | 'remediation';
-    roundIndex: number;
-    characterId: number;
-    isCorrect: boolean;
-    srsLevelBefore: number;
-    srsLevelAfter: number;
-  }) {
+  useEffect(() => {
+    if (!currentRound) return;
+    if (status !== 'playing' && status !== 'remediationPlaying') return;
+    roundStartRef.current = null;
+    roundDiscardedRef.current = false;
+    let cancelled = false;
+    const id = requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (!cancelled) roundStartRef.current = performance.now();
+      })
+    );
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(id);
+    };
+  }, [currentRound, status]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        roundDiscardedRef.current = true;
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  function enqueueAnswerPost(payload: GameAnswerInput) {
     outboxTailRef.current = outboxTailRef.current.then(() => postWithRetry(payload));
   }
 
-  async function postWithRetry(
-    payload: {
-      phase: 'main' | 'remediation';
-      roundIndex: number;
-      characterId: number;
-      isCorrect: boolean;
-      srsLevelBefore: number;
-      srsLevelAfter: number;
-    },
-    attempt = 0
-  ): Promise<void> {
+  async function postWithRetry(payload: GameAnswerInput, attempt = 0): Promise<void> {
     try {
       await apiClient.postAnswer(input.sessionId, payload);
     } catch (err) {
@@ -248,12 +293,39 @@ export function useGameSession(input: UseGameSessionInput) {
     const totalCorrect = mainAnswers.filter((a) => a.isCorrect).length;
     const totalWrong = mainAnswers.filter((a) => !a.isCorrect).length;
 
+    const fluencyBreakdown = {
+      lightning: 0,
+      fluent: 0,
+      hesitant: 0,
+      unscored: 0,
+    };
+    for (const a of mainAnswers) {
+      if (a.fluency === 'lightning') {
+        fluencyBreakdown.lightning += 1;
+      } else if (a.fluency === 'fluent') {
+        fluencyBreakdown.fluent += 1;
+      } else if (a.fluency === 'hesitant') {
+        fluencyBreakdown.hesitant += 1;
+      } else {
+        fluencyBreakdown.unscored += 1;
+      }
+    }
+
+    const mainElapsedSamples = mainAnswers
+      .map((a) => a.elapsedMs)
+      .filter((ms): ms is number => ms !== null);
+    const medianElapsedMs = medianMs(mainElapsedSamples);
+    const promotionsBlocked = mainAnswers.filter((a) => a.blocked).length;
+
     const summary: FinalSummary = {
       totalRoundsPlayed: mainAnswers.length,
       totalCorrect,
       totalWrong,
       remediationRoundsPlayed: remediationAnswers.length,
       accuracy: mainAnswers.length > 0 ? totalCorrect / mainAnswers.length : 0,
+      fluencyBreakdown,
+      medianElapsedMs,
+      promotionsBlocked,
     };
 
     setFinalSummary(summary);
@@ -275,9 +347,9 @@ export function useGameSession(input: UseGameSessionInput) {
       finalizeSession();
       return;
     }
-    const snapshot: MissedCharacter[] = missedIds.map((id) => {
-      const c = liveCharsRef.current.get(id)!;
-      return { id: c.id, name: c.name, imageUrl: c.images[0] ?? '' };
+    const snapshot: MissedCharacter[] = missedIds.flatMap((id) => {
+      const c = liveCharsRef.current.get(id);
+      return c ? [{ id: c.id, name: c.name, imageUrl: c.images[0] ?? '' }] : [];
     });
     setMissedCharacters(snapshot);
     setStatus('results');
@@ -301,13 +373,18 @@ export function useGameSession(input: UseGameSessionInput) {
   }
 
   async function advanceRemediation() {
-    const tracker = remediationTrackerRef.current!;
-    if (tracker.isComplete()) {
+    const tracker = remediationTrackerRef.current;
+    if (!tracker || tracker.isComplete()) {
       await wait(FEEDBACK_MS);
       finalizeSession();
       return;
     }
-    const nextId = tracker.getNextTarget()!;
+    const nextId = tracker.getNextTarget();
+    if (nextId === null) {
+      await wait(FEEDBACK_MS);
+      finalizeSession();
+      return;
+    }
     const next = buildRoundData(nextId, input.mode, liveCharsRef.current);
     await Promise.all([wait(FEEDBACK_MS), preloadRound(next)]);
     setCurrentRound(next);
@@ -325,27 +402,82 @@ export function useGameSession(input: UseGameSessionInput) {
     const roundIndex =
       phase === 'main' ? mainRoundIndexRef.current : remediationRoundIndexRef.current;
 
-    const liveChar = liveCharsRef.current.get(targetId)!;
+    const liveChar = liveCharsRef.current.get(targetId);
+    if (!liveChar) {
+      return;
+    }
     const srsLevelBefore = liveChar.srsLevel;
-    const srsLevelAfter = srsTransition(srsLevelBefore, isCorrect);
-    liveChar.srsLevel = srsLevelAfter;
 
-    answersRef.current.push({ characterId: targetId, phase, isCorrect, roundIndex });
+    const elapsedMs =
+      roundStartRef.current === null || roundDiscardedRef.current
+        ? null
+        : Math.round(performance.now() - roundStartRef.current);
+
+    if (phase === 'main' && elapsedMs !== null) {
+      sessionSamplesRef.current.push(elapsedMs);
+    }
+
+    const serverBaseline =
+      input.mode === 'classic'
+        ? input.latencyBaseline?.classic ?? null
+        : input.latencyBaseline?.match ?? null;
+    const serverSamples =
+      input.mode === 'classic'
+        ? input.latencyBaseline?.classicSamples ?? 0
+        : input.latencyBaseline?.matchSamples ?? 0;
+
+    const sessionSamples = sessionSamplesRef.current;
+    const sessionMedian =
+      sessionSamples.length >= MIN_LATENCY_SAMPLES ? medianMs(sessionSamples) : null;
+    const baselineForMode = sessionMedian ?? serverBaseline;
+    const sampleCountForMode = Math.max(serverSamples, sessionSamples.length);
+
+    const thresholds = deriveFluencyThresholds(baselineForMode, sampleCountForMode);
+    const fluency = classifyFluency(elapsedMs, thresholds);
+    const streakForCharacter = hesitantStreakRef.current.get(targetId) ?? 0;
+    const decision = applyFluencyToPromotion(srsLevelBefore, isCorrect, fluency, streakForCharacter);
+    hesitantStreakRef.current.set(targetId, decision.hesitantStreak);
+    liveChar.srsLevel = decision.srsLevelAfter;
+
+    answersRef.current.push({
+      characterId: targetId,
+      phase,
+      isCorrect,
+      roundIndex,
+      elapsedMs,
+      fluency,
+      blocked: decision.blocked,
+    });
 
     if (phase === 'main') {
       mainRoundIndexRef.current += 1;
       if (!isCorrect) missedIdsRef.current.add(targetId);
     } else {
       remediationRoundIndexRef.current += 1;
-      remediationTrackerRef.current!.applyAnswer(targetId, isCorrect);
-      const tracker = remediationTrackerRef.current!;
-      setRemediationProgress({
-        masteredCount: tracker.getMasteredCount(),
-        totalCount: tracker.getTotalCount(),
-      });
+      const tracker = remediationTrackerRef.current;
+      if (tracker) {
+        tracker.applyAnswer(targetId, isCorrect);
+        setRemediationProgress({
+          masteredCount: tracker.getMasteredCount(),
+          totalCount: tracker.getTotalCount(),
+        });
+      }
     }
 
-    enqueueAnswerPost({ phase, roundIndex, characterId: targetId, isCorrect, srsLevelBefore, srsLevelAfter });
+    const payload: GameAnswerInput = {
+      phase,
+      roundIndex,
+      characterId: targetId,
+      isCorrect,
+      srsLevelBefore,
+      srsLevelAfter: decision.srsLevelAfter,
+      selectedCharacterId: isCorrect ? null : selectedId,
+      elapsedMs,
+      fluency,
+      mode: input.mode,
+    };
+
+    enqueueAnswerPost(payload);
 
     setSelectedCharacterId(selectedId);
     setLastAnswerCorrect(isCorrect);
@@ -371,7 +503,11 @@ export function useGameSession(input: UseGameSessionInput) {
     remediationRoundIndexRef.current = 0;
     setRemediationProgress({ masteredCount: 0, totalCount: tracker.getTotalCount() });
 
-    const nextId = tracker.getNextTarget()!;
+    const nextId = tracker.getNextTarget();
+    if (nextId === null) {
+      finalizeSession();
+      return;
+    }
     const round = buildRoundData(nextId, input.mode, liveCharsRef.current);
     setCurrentRound(round);
     setSelectedCharacterId(null);

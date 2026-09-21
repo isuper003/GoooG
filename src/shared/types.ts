@@ -67,7 +67,12 @@ export interface GameSessionCreateResponse {
   pool: GameSessionPoolCharacter[];
   focusIds?: number[] | null;
   confusion?: Record<number, ConfusionEntry[]>;
-  latencyBaseline?: { classic: number | null; match: number | null };
+  latencyBaseline?: {
+    classic: number | null;
+    match: number | null;
+    classicSamples: number;
+    matchSamples: number;
+  };
 }
 
 export interface GameAnswerResponse {
