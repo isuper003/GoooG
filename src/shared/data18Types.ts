@@ -1,3 +1,5 @@
+import type { GalleryCard } from './galleryTypes';
+
 export interface Data18CastMember {
   name: string;
   slug: string;
@@ -151,6 +153,8 @@ export interface Data18PornPicsResult {
   searchUrl: string;
   avatarUrl: string;
   images: string[];
+  /** The galleries behind those covers, so their full photo sets can be opened. */
+  galleries: GalleryCard[];
 }
 
 export interface Data18ScenesResponse {
@@ -169,4 +173,32 @@ export interface Data18SearchResponse {
   query: string;
   type: string;
   results: Data18SearchResult[];
+}
+
+export interface Data18Favorite {
+  id: number;
+  path: string;
+  kind: Data18EntityDetail['type'];
+  slug: string;
+  name: string;
+  /** Newest scene id the user has already seen (null until first baseline). */
+  lastSeenSceneId: string | null;
+  createdAt: string;
+}
+
+export interface Data18FeedItem {
+  favorite: Data18Favorite;
+  /** Latest scenes (newest first). */
+  scenes: Data18Scene[];
+  /** How many of `scenes` are newer than the last seen scene. */
+  newCount: number;
+  newestSceneId: string | null;
+  /** Set when this favorite's page could not be loaded right now. */
+  error?: string;
+}
+
+export interface Data18FeedResponse {
+  items: Data18FeedItem[];
+  /** Total number of favorites; the feed only loads the most recent ones. */
+  totalFavorites: number;
 }

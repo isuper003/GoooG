@@ -10,6 +10,7 @@ import type {
   ReviewQueuesDTO,
   HeatmapResponse,
 } from '../../shared/types';
+import type { GalleryCard, GalleryImagesResponse } from '../../shared/galleryTypes';
 import type {
   Data18ScenesResponse,
   Data18MoviesResponse,
@@ -19,6 +20,8 @@ import type {
   Data18SceneDetail,
   Data18MovieDetail,
   Data18PornPicsResult,
+  Data18Favorite,
+  Data18FeedResponse,
 } from '../../shared/data18Types';
 import type {
   GameSessionCreateInput,
@@ -188,6 +191,9 @@ export const apiClient = {
   getData18Scenes: (page = 1) =>
     request<Data18ScenesResponse>(`/api/data18/scenes?page=${page}`),
 
+  getData18Upcoming: (page = 1) =>
+    request<Data18ScenesResponse>(`/api/data18/upcoming?page=${page}`),
+
   getData18Movies: (page = 1) =>
     request<Data18MoviesResponse>(`/api/data18/movies?page=${page}`),
 
@@ -210,6 +216,30 @@ export const apiClient = {
   getData18Movie: (slug: string) =>
     request<Data18MovieDetail>(`/api/data18/movie/${encodeURIComponent(slug)}`),
 
+  getData18Favorites: () => request<{ favorites: Data18Favorite[] }>('/api/data18/favorites'),
+
+  addData18Favorite: (path: string) =>
+    request<Data18Favorite>('/api/data18/favorites', {
+      method: 'POST',
+      body: JSON.stringify({ path }),
+    }),
+
+  removeData18Favorite: (path: string) =>
+    request<{ ok: boolean }>(`/api/data18/favorites?path=${encodeURIComponent(path)}`, {
+      method: 'DELETE',
+    }),
+
+  markData18Seen: (items: { path: string; sceneId: string }[]) =>
+    request<{ ok: boolean; updated: number }>('/api/data18/favorites/seen', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    }),
+
+  getData18Feed: () => request<Data18FeedResponse>('/api/data18/feed'),
+
+  getGalleryImages: (url: string) =>
+    request<GalleryImagesResponse>(`/api/crawler/gallery?url=${encodeURIComponent(url)}`),
+
   searchPornPics: (name: string) =>
     request<Data18PornPicsResult>(`/api/data18/pornpics?name=${encodeURIComponent(name)}`),
 };
@@ -217,6 +247,7 @@ export const apiClient = {
 interface CrawledItem {
   name: string;
   avatarUrl?: string;
+  galleries?: GalleryCard[];
   categoryKey: 'trans' | 'sluts' | 'twinks';
   availableImages: string[];
 }

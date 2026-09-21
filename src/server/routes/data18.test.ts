@@ -70,6 +70,26 @@ describe('Data18 Parsers (synthetic markup)', () => {
       expect(parseScenesFromData18(html)[0].imageUrl).toBe('https://cdn.dt18.com/media/t/3/scenes/1/0/1.jpg');
     });
 
+    it('parses scenes whose links carry a title slug after the id', () => {
+      const html = `
+        <div id="item3">
+          <a href="https://www.data18.com/scenes/3137398-a-messy-detention#trailer" title="play scene trailer">t</a>
+          <a href="https://www.data18.com/scenes/3137398-a-messy-detention#image1901" title="31 pictures/videostills">31</a>
+          <a href="https://www.data18.com/scenes/3137398-a-messy-detention" title="A Messy Detention"><img class="yborder" src="https://cdn.dt18.com/media/t/3/scenes/3/6/137398.jpg" alt="A Messy Detention" /></a>
+          <a href="https://www.data18.com/scenes/3137398-a-messy-detention" class="gen12 bold">A Messy Detention</a>
+          <p>Cast: <a href="https://www.data18.com/name/coco-lovelock">Coco&nbsp;Lovelock</a></p>
+          <p>Studio: <a href="https://www.data18.com/studios/pure-taboo">Pure Taboo</a></p>
+        </div>`;
+      const [scene] = parseScenesFromData18(html);
+      expect(scene).toMatchObject({
+        id: '3137398',
+        url: 'https://www.data18.com/scenes/3137398-a-messy-detention',
+        title: 'A Messy Detention',
+        imageUrl: 'https://cdn.dt18.com/media/t/3/scenes/3/6/137398.jpg',
+      });
+      expect(scene.cast[0].slug).toBe('coco-lovelock');
+    });
+
     it('does not return an empty string as the date', () => {
       const html = `
         <div id="item1">
@@ -365,6 +385,22 @@ describe('data18 routes', () => {
     const pagingUrl = String(fetchMock.mock.calls.map((c) => String(c[0])).find((u) => u.includes('/sys/page.php')));
     expect(pagingUrl).toContain('t=2&b=3&o=0&html=movie-tab-performer');
     expect(pagingUrl).toContain('spage=2');
+  });
+
+  it('lists upcoming scenes with the total from the page header', async () => {
+    const item = `<div id="item1"><a href="https://www.data18.com/scenes/555"><img src="https://cdn.dt18.com/media/t/3/scenes/1/0/555.jpg" /></a>
+      <a href="https://www.data18.com/scenes/555" class="gen12 bold">Upcoming One</a></div>`;
+    const fetchMock = vi.fn(async (_url: string | URL | Request) => new Response(`<b>84 Scenes</b>${item}`));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await data18Router.request('/upcoming?page=2');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { page: number; totalFound: number; scenes: { id: string }[] };
+    expect(body).toMatchObject({ page: 2, totalFound: 84 });
+    expect(body.scenes.map((s) => s.id)).toEqual(['555']);
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('html=upcoming');
+    expect(url).toContain('spage=2');
   });
 
   it('maps an upstream 404 to a 404', async () => {
