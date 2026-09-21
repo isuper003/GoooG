@@ -8,3 +8,8 @@ export function useStatsOverview() {
 export function useConfusions() {
   return useQuery({ queryKey: ['stats', 'confusions'], queryFn: () => apiClient.getConfusions() });
 }
+
+export function useHeatmap() {
+  return useQuery({ queryKey: ['stats', 'heatmap'], queryFn: () => apiClient.getHeatmap() });
+}
+

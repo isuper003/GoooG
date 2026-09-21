@@ -7,6 +7,7 @@ import LeechAlert from '../components/stats/LeechAlert';
 import CategoryAccuracyChart from '../components/stats/CategoryAccuracyChart';
 import SrsDistributionChart from '../components/stats/SrsDistributionChart';
 import ConfusedPairsList from '../components/stats/ConfusedPairsList';
+import MemoryHeatmap from '../components/stats/MemoryHeatmap';
 import CharacterStatsTable from '../components/stats/CharacterStatsTable';
 
 export default function StatsPage() {
@@ -51,6 +52,8 @@ export default function StatsPage() {
           </div>
 
           <ConfusedPairsList pairs={confusions} />
+
+          <MemoryHeatmap />
 
           <CharacterStatsTable characters={characters} sort={sort} onSortChange={setSort} />
         </>

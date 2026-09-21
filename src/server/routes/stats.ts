@@ -1,6 +1,13 @@
 import { Hono } from 'hono';
 import { queryAll, queryOne } from '../db';
-import type { StatsOverview, CategoryStats, ConfusedPair } from '../../shared/types';
+import type {
+  StatsOverview,
+  CategoryStats,
+  ConfusedPair,
+  HeatmapCell,
+  HeatmapResponse,
+} from '../../shared/types';
+import { heatCellState, type HeatCellState } from '../../shared/srs';
 import type { AppEnv } from '../app';
 
 interface ConfusedPairRow {
@@ -149,3 +156,103 @@ statsRouter.get('/confusions', async (c) => {
 
   return c.json(response);
 });
+
+interface HeatmapQueryRow {
+  id: number;
+  name: string;
+  category_key: string;
+  srs_level: number;
+  correct_count: number;
+  wrong_count: number;
+  is_leech: number;
+  next_review_at: string | null;
+}
+
+// GET /api/stats/heatmap
+statsRouter.get('/heatmap', async (c) => {
+  const rows = await queryAll<HeatmapQueryRow>(
+    c.env.DB,
+    `SELECT c.id, c.name, cat.key AS category_key, c.srs_level,
+            c.correct_count, c.wrong_count, c.is_leech, c.next_review_at
+     FROM characters c
+     JOIN categories cat ON c.category_id = cat.id
+     WHERE c.is_active = 1
+     ORDER BY cat.sort_order ASC, c.name ASC`
+  );
+
+  const nowIso = new Date().toISOString();
+
+  const byState: Record<HeatCellState, number> = {
+    mastered: 0,
+    solid: 0,
+    learning: 0,
+    critical: 0,
+    unseen: 0,
+  };
+
+  const cells: HeatmapCell[] = [];
+
+  interface CriticalCandidate {
+    id: number;
+    isLeech: boolean;
+    nextReviewAt: string | null;
+  }
+  const criticalCandidates: CriticalCandidate[] = [];
+
+  for (const r of rows) {
+    const isLeech = Boolean(r.is_leech);
+    const state = heatCellState(
+      {
+        srsLevel: r.srs_level,
+        correctCount: r.correct_count,
+        wrongCount: r.wrong_count,
+        isLeech,
+        nextReviewAt: r.next_review_at,
+      },
+      nowIso
+    );
+
+    cells.push({
+      id: Number(r.id),
+      name: r.name,
+      categoryKey: r.category_key,
+      srsLevel: Number(r.srs_level),
+      state,
+    });
+
+    byState[state]++;
+
+    if (state === 'critical') {
+      criticalCandidates.push({
+        id: Number(r.id),
+        isLeech,
+        nextReviewAt: r.next_review_at,
+      });
+    }
+  }
+
+  criticalCandidates.sort((a, b) => {
+    if (a.isLeech !== b.isLeech) {
+      return a.isLeech ? -1 : 1;
+    }
+    const aTime = a.nextReviewAt ? Date.parse(a.nextReviewAt) : Number.POSITIVE_INFINITY;
+    const bTime = b.nextReviewAt ? Date.parse(b.nextReviewAt) : Number.POSITIVE_INFINITY;
+    const validA = Number.isFinite(aTime) ? aTime : Number.POSITIVE_INFINITY;
+    const validB = Number.isFinite(bTime) ? bTime : Number.POSITIVE_INFINITY;
+    if (validA !== validB) {
+      return validA - validB;
+    }
+    return a.id - b.id;
+  });
+
+  const criticalIds = criticalCandidates.slice(0, 100).map((cand) => cand.id);
+
+  const response: HeatmapResponse = {
+    cells,
+    byState,
+    criticalIds,
+  };
+
+  return c.json(response);
+});
+

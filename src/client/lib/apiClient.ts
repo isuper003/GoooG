@@ -8,6 +8,7 @@ import type {
   StatsOverview,
   ConfusedPair,
   ReviewQueuesDTO,
+  HeatmapResponse,
 } from '../../shared/types';
 import type {
   GameSessionCreateInput,
@@ -97,6 +98,8 @@ export const apiClient = {
     return request<CharacterDTO[]>(`/api/characters${qs ? `?${qs}` : ''}`);
   },
 
+  getCharacter: (id: number) => request<CharacterDTO>(`/api/characters/${id}`),
+
   createCharacter: (body: CharacterCreateInput) =>
     request<CharacterDTO>('/api/characters', {
       method: 'POST',
@@ -134,6 +137,8 @@ export const apiClient = {
     const qs = limit !== undefined ? `?limit=${encodeURIComponent(limit)}` : '';
     return request<ConfusedPair[]>(`/api/stats/confusions${qs}`);
   },
+
+  getHeatmap: () => request<HeatmapResponse>('/api/stats/heatmap'),
 
   createGameSession: (body: GameSessionCreateInput) =>
     request<GameSessionCreateResponse>('/api/game-sessions', {
