@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react';
 import { toProxiedImageUrl } from '../../lib/imageUrl';
+import type { GalleryCard } from '../../../shared/galleryTypes';
+import GalleryBrowser from '../shared/GalleryBrowser';
 
 interface BottomImageTrayProps {
   availableImages: string[];
@@ -9,6 +11,8 @@ interface BottomImageTrayProps {
   onAddImage: (url: string) => void;
   onRemoveCandidate: (url: string) => void;
   showAddUrl?: boolean;
+  /** Galleries behind the crawled covers; when present, their full photo sets can be browsed. */
+  galleries?: GalleryCard[];
 }
 
 export default function BottomImageTray({
@@ -19,7 +23,9 @@ export default function BottomImageTray({
   onAddImage,
   onRemoveCandidate,
   showAddUrl = false,
+  galleries,
 }: BottomImageTrayProps) {
+  const [showGalleries, setShowGalleries] = useState(false);
   const [newUrl, setNewUrl] = useState('');
   const [urlError, setUrlError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -108,6 +114,15 @@ export default function BottomImageTray({
           >
             Clear Selected
           </button>
+          {galleries && galleries.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setShowGalleries(true)}
+              className="rounded-button bg-accent/20 px-2.5 py-1 font-semibold text-accent hover:bg-accent/30 transition-colors"
+            >
+              📸 Browse galleries ({galleries.length})
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -225,6 +240,15 @@ export default function BottomImageTray({
           )}
         </div>
       )}
+
+      {showGalleries && galleries ? (
+        <GalleryBrowser
+          galleries={galleries}
+          pickedImages={availableImages}
+          onPickImage={onAddImage}
+          onClose={() => setShowGalleries(false)}
+        />
+      ) : null}
 
       {/* Direct Add Image URL row */}
       {showAddUrl ? (

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { toProxiedImageUrl } from '../../lib/imageUrl';
 import { usePornPicsSearch } from '../../hooks/useData18';
 import ImageLightbox from '../gallery/ImageLightbox';
+import GalleryBrowser from '../shared/GalleryBrowser';
 
 interface PornPicsPanelProps {
   /** Performer name as written on Data18. */
@@ -17,10 +18,12 @@ const SOURCE_LABEL = {
 export default function PornPicsPanel({ name }: PornPicsPanelProps) {
   const [requested, setRequested] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [browsingGalleries, setBrowsingGalleries] = useState(false);
   const { data, isFetching, error, refetch } = usePornPicsSearch(name, requested);
 
   const searchUrl = `https://www.pornpics.com/?q=${encodeURIComponent(name)}`;
   const images = data?.images ?? [];
+  const galleries = data?.galleries ?? [];
 
   return (
     <section className="rounded-2xl border border-pink-500/20 bg-pink-500/[0.04] p-4 sm:p-5 space-y-4">
@@ -80,6 +83,15 @@ export default function PornPicsPanel({ name }: PornPicsPanelProps) {
                 {SOURCE_LABEL[data.source]}
               </span>
               <span>{images.length} galleries</span>
+              {galleries.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setBrowsingGalleries(true)}
+                  className="rounded-md bg-pink-400 px-2 py-0.5 font-bold text-black hover:bg-pink-300 cursor-pointer"
+                >
+                  Browse all photos
+                </button>
+              ) : null}
             </div>
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
               {images.map((url, i) => (
@@ -104,6 +116,14 @@ export default function PornPicsPanel({ name }: PornPicsPanelProps) {
             </div>
           </>
         )
+      ) : null}
+
+      {browsingGalleries ? (
+        <GalleryBrowser
+          galleries={galleries}
+          title={`${name} galleries`}
+          onClose={() => setBrowsingGalleries(false)}
+        />
       ) : null}
 
       {lightboxIndex !== null ? (

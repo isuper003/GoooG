@@ -35,7 +35,7 @@ import {
   parseTotalFound,
   topBy,
 } from '../lib/data18Parsers';
-import { extractProfileGallery, slugifyName } from './crawler';
+import { extractGalleryCards, extractProfileGallery, slugifyName } from './crawler';
 
 // Re-exported so the parsers can be unit-tested through this module.
 export * from '../lib/data18Parsers';
@@ -307,6 +307,7 @@ data18Router.get(
       searchUrl,
       avatarUrl: '',
       images: [],
+      galleries: [],
     };
 
     // 1) The performer's own page. 2) The site search, which redirects to the page when
@@ -324,6 +325,7 @@ data18Router.get(
       result.pageUrl = page.finalUrl;
       result.avatarUrl = avatarUrl;
       result.images = images;
+      result.galleries = extractGalleryCards(page.html, page.finalUrl);
       break;
     }
 

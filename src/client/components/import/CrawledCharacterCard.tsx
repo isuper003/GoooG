@@ -2,6 +2,7 @@ import type { CharacterDTO } from '../../../shared/types';
 import LabelMultiSelect from '../shared/LabelMultiSelect';
 import BottomImageTray from './BottomImageTray';
 import { toProxiedImageUrl } from '../../lib/imageUrl';
+import type { GalleryCard } from '../../../shared/galleryTypes';
 
 export interface CrawlerQueueItem {
   id: string;
@@ -10,6 +11,8 @@ export interface CrawlerQueueItem {
   categoryKey: 'trans' | 'sluts' | 'twinks';
   labelIds: number[];
   availableImages: string[];
+  /** Galleries the crawled covers came from (absent for characters that already exist). */
+  galleries?: GalleryCard[];
   selectedImages: string[];
   status: 'pending' | 'imported' | 'failed';
   error?: string;
@@ -161,6 +164,7 @@ export default function CrawledCharacterCard({ item, duplicate, onUpdate }: Craw
         onAddImage={addAvailableImage}
         onRemoveCandidate={removeCandidateImage}
         showAddUrl={false}
+        galleries={item.galleries}
       />
     </div>
   );

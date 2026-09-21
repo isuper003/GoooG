@@ -74,6 +74,7 @@ export default function CrawlByNameSection() {
           categoryKey: category,
           labelIds: duplicate ? duplicate.labels.map((l) => l.id) : [],
           availableImages,
+          galleries: duplicate ? undefined : item.galleries,
           selectedImages: availableImages.slice(0, 6),
           status: 'pending',
           isSelected: !isDuplicate,

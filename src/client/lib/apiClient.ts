@@ -10,6 +10,7 @@ import type {
   ReviewQueuesDTO,
   HeatmapResponse,
 } from '../../shared/types';
+import type { GalleryCard, GalleryImagesResponse } from '../../shared/galleryTypes';
 import type {
   Data18ScenesResponse,
   Data18MoviesResponse,
@@ -210,6 +211,9 @@ export const apiClient = {
   getData18Movie: (slug: string) =>
     request<Data18MovieDetail>(`/api/data18/movie/${encodeURIComponent(slug)}`),
 
+  getGalleryImages: (url: string) =>
+    request<GalleryImagesResponse>(`/api/crawler/gallery?url=${encodeURIComponent(url)}`),
+
   searchPornPics: (name: string) =>
     request<Data18PornPicsResult>(`/api/data18/pornpics?name=${encodeURIComponent(name)}`),
 };
@@ -217,6 +221,7 @@ export const apiClient = {
 interface CrawledItem {
   name: string;
   avatarUrl?: string;
+  galleries?: GalleryCard[];
   categoryKey: 'trans' | 'sluts' | 'twinks';
   availableImages: string[];
 }

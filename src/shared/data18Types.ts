@@ -1,3 +1,5 @@
+import type { GalleryCard } from './galleryTypes';
+
 export interface Data18CastMember {
   name: string;
   slug: string;
@@ -151,6 +153,8 @@ export interface Data18PornPicsResult {
   searchUrl: string;
   avatarUrl: string;
   images: string[];
+  /** The galleries behind those covers, so their full photo sets can be opened. */
+  galleries: GalleryCard[];
 }
 
 export interface Data18ScenesResponse {

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../app';
 import { queryAll, queryOne, queryAllChunked } from '../db';
+import type { GalleryCard } from '../../shared/galleryTypes';
 
 export const crawlerRouter = new Hono<AppEnv>();
 
@@ -22,6 +23,7 @@ export interface ExtractedItem {
   avatarUrl: string; // Profile image
   categoryKey: 'trans' | 'sluts' | 'twinks';
   availableImages: string[]; // Gallery images, excluding profile avatar
+  galleries?: GalleryCard[]; // Galleries behind the cover images, for browsing their photos
 }
 
 interface ProfileLink {
@@ -260,6 +262,87 @@ export function extractProfileGallery(
   return { avatarUrl, images };
 }
 
+// ---------------------------------------------------------------------------
+// Galleries: a performer page lists one card per gallery (cover + link); the
+// gallery page itself holds the full-size photos.
+// ---------------------------------------------------------------------------
+
+const MAX_GALLERY_CARDS = 40;
+const MAX_PHOTOS_PER_GALLERY = 60;
+
+/**
+ * Returns the canonical `https://www.pornpics.com/galleries/<slug>/` form of a gallery
+ * URL, or null for anything else (other hosts, http, ports, credentials, other paths).
+ */
+export function normalizeGalleryUrl(input: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(input);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' || url.hostname !== 'www.pornpics.com') return null;
+  if (url.username || url.password || url.port) return null;
+  const match = url.pathname.match(/^\/galleries\/([a-z0-9-]+)\/?$/);
+  return match ? `https://www.pornpics.com/galleries/${match[1]}/` : null;
+}
+
+// Every gallery on a performer/search page is an <a href=gallery><img cover></a> card.
+export function extractGalleryCards(html: string, baseUrl: string): GalleryCard[] {
+  const cards = new Map<string, GalleryCard>();
+  const cardRegex = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = cardRegex.exec(html)) !== null && cards.size < MAX_GALLERY_CARDS) {
+    const hrefRaw = getAttr(match[1], 'href');
+    if (!hrefRaw) continue;
+    let absolute: string;
+    try {
+      absolute = new URL(hrefRaw, baseUrl).href;
+    } catch {
+      continue;
+    }
+    const url = normalizeGalleryUrl(absolute);
+    if (!url || cards.has(url)) continue;
+
+    const imgTag = match[2].match(/<img\s+[^>]+>/i)?.[0];
+    if (!imgTag) continue;
+    const src = bestImageSrc(imgTag);
+    const cover = src ? toAbsoluteUrl(src, baseUrl) : null;
+    if (!cover || isLikelyLogoOrIcon(imgTag, cover)) continue;
+
+    const title = cleanName(getAttr(match[1], 'title') || getAttr(imgTag, 'alt') || '');
+    cards.set(url, { cover, url, title });
+  }
+
+  return Array.from(cards.values());
+}
+
+// A gallery page lists its photos as <a class="rel-link" href="full-size.jpg">.
+export function extractGalleryImages(html: string, baseUrl: string): string[] {
+  const images: string[] = [];
+  const seen = new Set<string>();
+  const add = (raw: string | null) => {
+    if (!raw || images.length >= MAX_PHOTOS_PER_GALLERY) return;
+    const abs = toAbsoluteUrl(raw, baseUrl);
+    if (!abs || !/^https?:\/\//.test(abs) || !/\.(?:jpe?g|png|webp)(?:[?#]|$)/i.test(abs)) return;
+    if (seen.has(abs)) return;
+    seen.add(abs);
+    images.push(abs);
+  };
+
+  for (const m of html.matchAll(/<a\b[^>]*\brel-link\b[^>]*>/gi)) add(getAttr(m[0], 'href'));
+
+  if (images.length === 0) {
+    // Fallback: the thumbnails inside the tile list (upgraded to full size).
+    for (const m of html.matchAll(/<li\b[^>]*thumbwook[^>]*>[\s\S]*?<\/li>/gi)) {
+      const imgTag = m[0].match(/<img\s+[^>]+>/i)?.[0];
+      add(imgTag ? bestImageSrc(imgTag) : null);
+    }
+  }
+  return images;
+}
+
 // Fetches one character's own profile page and extracts their avatar +
 // gallery. Never throws — a missing/unreachable profile just comes back with
 // no images, which the review UI already surfaces as "needs images added".
@@ -275,7 +358,8 @@ async function fetchProfile(
     }
     const profileHtml = await profileRes.text();
     const { avatarUrl, images } = extractProfileGallery(profileHtml, profileUrl);
-    return { name, avatarUrl, categoryKey, availableImages: images };
+    const galleries = extractGalleryCards(profileHtml, profileUrl);
+    return { name, avatarUrl, categoryKey, availableImages: images, galleries };
   } catch {
     return { name, avatarUrl: '', categoryKey, availableImages: [] };
   }
@@ -479,3 +563,28 @@ crawlerRouter.post('/fetch-by-name', zValidator('json', crawlerFetchByNameSchema
     items,
   });
 });
+
+// GET /api/crawler/gallery?url=https://www.pornpics.com/galleries/<slug>/
+// Full-size photos of one gallery. The URL is validated before anything is fetched.
+crawlerRouter.get(
+  '/gallery',
+  zValidator('query', z.object({ url: z.string().max(300) })),
+  async (c) => {
+    const url = normalizeGalleryUrl(c.req.valid('query').url);
+    if (!url) return c.json({ error: 'Only pornpics.com gallery URLs are supported' }, 400);
+
+    try {
+      const res = await fetch(url, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12_000) });
+      if (res.status === 404) return c.json({ error: 'Gallery not found' }, 404);
+      if (!res.ok) return c.json({ error: `PornPics responded with HTTP ${res.status}` }, 502);
+
+      const html = await res.text();
+      const title = cleanName(html.match(/<title>([^<]*)<\/title>/i)?.[1]?.replace(/\s*-\s*PornPics\.com\s*$/i, '') ?? '');
+      c.header('Cache-Control', 'public, max-age=1800');
+      return c.json({ url, title, images: extractGalleryImages(html, url) });
+    } catch (err: unknown) {
+      const timedOut = err instanceof Error && /timeout|aborted/i.test(`${err.name} ${err.message}`);
+      return c.json({ error: timedOut ? 'PornPics request timed out' : 'Failed to fetch gallery' }, timedOut ? 504 : 502);
+    }
+  }
+);

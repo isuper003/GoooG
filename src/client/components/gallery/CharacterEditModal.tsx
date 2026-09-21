@@ -5,6 +5,7 @@ import { apiClient, ApiError } from '../../lib/apiClient';
 import LabelMultiSelect from '../shared/LabelMultiSelect';
 import ImageUrlListEditor from '../shared/ImageUrlListEditor';
 import BottomImageTray from '../import/BottomImageTray';
+import type { GalleryCard } from '../../../shared/galleryTypes';
 
 interface CharacterEditModalProps {
   character: CharacterDTO;
@@ -30,6 +31,7 @@ export default function CharacterEditModal({ character, onClose }: CharacterEdit
   const [isCrawling, setIsCrawling] = useState(false);
   const [crawlError, setCrawlError] = useState<string | null>(null);
   const [candidateImages, setCandidateImages] = useState<string[]>([]);
+  const [galleries, setGalleries] = useState<GalleryCard[]>([]);
   const [showTray, setShowTray] = useState(false);
 
   const updateCharacter = useUpdateCharacter();
@@ -63,6 +65,7 @@ export default function CharacterEditModal({ character, onClose }: CharacterEdit
       } else {
         const combined = Array.from(new Set([...images, ...foundItem.availableImages]));
         setCandidateImages(combined);
+        setGalleries(foundItem.galleries ?? []);
         setShowTray(true);
       }
     } catch (err: unknown) {
@@ -244,6 +247,7 @@ export default function CharacterEditModal({ character, onClose }: CharacterEdit
                 onAddImage={addCandidateImage}
                 onRemoveCandidate={removeCandidateImage}
                 showAddUrl={false}
+                galleries={galleries}
               />
             </div>
           ) : null}
