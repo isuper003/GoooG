@@ -99,7 +99,6 @@ export default function SceneDetailView({ scene }: { scene: Data18SceneDetail })
                 movieTitle={scene.movie?.title}
                 studioName={scene.studio?.name}
                 castNames={scene.cast?.map((c) => c.name)}
-                align="left"
                 variant="detail"
               />
 

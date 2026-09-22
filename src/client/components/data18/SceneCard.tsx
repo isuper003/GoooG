@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom';
 import type { Data18Scene } from '../../../shared/data18Types';
 import { toProxiedImageUrl } from '../../lib/imageUrl';
 import { performerHref, sceneHref, studioHref } from '../../lib/data18Nav';
-import WatchSearchMenu from './WatchSearchMenu';
 
 interface SceneCardProps {
   scene: Data18Scene;
@@ -54,38 +53,28 @@ export default function SceneCard({ scene, onZoomImage }: SceneCardProps) {
           ) : null}
         </div>
 
-        {/* Quick Actions: Watch/Search + Data18 Link */}
-        <div className="absolute bottom-2.5 right-2.5 flex items-center gap-1.5 z-10">
-          <WatchSearchMenu
-            title={scene.title}
-            studioName={scene.studio?.name}
-            castNames={scene.cast?.map((c) => c.name)}
-            align="right"
-            variant="card"
-          />
-
-          <a
-            href={scene.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Open scene on Data18"
-            className="rounded-lg bg-black/70 backdrop-blur-md p-1.5 text-white/60 hover:text-white hover:bg-cyan-500 hover:text-black transition-all shadow-md"
+        {/* Quick External Link */}
+        <a
+          href={scene.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open scene on Data18"
+          className="absolute bottom-2.5 right-2.5 rounded-lg bg-black/70 backdrop-blur-md p-1.5 text-white/60 hover:text-white hover:bg-cyan-500 hover:text-black transition-all shadow-md"
+        >
+          <svg
+            className="w-3.5 h-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
           >
-            <svg
-              className="w-3.5 h-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-              />
-            </svg>
-          </a>
-        </div>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+            />
+          </svg>
+        </a>
       </div>
 
       {/* Card Body */}
