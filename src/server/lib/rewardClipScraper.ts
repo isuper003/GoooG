@@ -10,6 +10,57 @@ export interface RewardClipResult {
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
+// In-memory cached temporary token for verifying RedGIFs clip availability
+let cachedToken: { token: string; expiresAt: number } | null = null;
+
+async function getRedGifsToken(): Promise<string | null> {
+  if (cachedToken && Date.now() < cachedToken.expiresAt) {
+    return cachedToken.token;
+  }
+  try {
+    const res = await fetch('https://api.redgifs.com/v2/auth/temporary', {
+      headers: { 'User-Agent': USER_AGENT },
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { token?: string };
+    if (data.token) {
+      cachedToken = { token: data.token, expiresAt: Date.now() + 20 * 60 * 60 * 1000 };
+      return data.token;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+/**
+ * Verifies if a clip ID is active and not deleted on RedGIFs.
+ * Returns true if alive or if verification couldn't run.
+ * Returns false ONLY when confirmed deleted/not found.
+ */
+export async function isClipAlive(code: string, token: string | null): Promise<boolean> {
+  if (!token || !code) return true;
+  try {
+    const res = await fetch(`https://api.redgifs.com/v2/gifs/${code.toLowerCase()}`, {
+      headers: {
+        'User-Agent': USER_AGENT,
+        Authorization: `Bearer ${token}`,
+      },
+      signal: AbortSignal.timeout(1500),
+    });
+    if (res.status === 404 || res.status === 410) return false;
+    if (!res.ok) return true; // transient status, don't discard
+    const data = (await res.json()) as { error?: { code?: string } };
+    if (data.error && (data.error.code === 'GifDeleted' || data.error.code === 'GifNotFound')) {
+      return false;
+    }
+    return true;
+  } catch {
+    return true; // network error/timeout: assume alive
+  }
+}
+
 /**
  * Extracts unique RedGIFs clip IDs from xgif.cc HTML.
  * Preserves PascalCase formatting when available from preview/CDN links.
@@ -61,7 +112,8 @@ export function extractClipCodes(html: string): string[] {
 
 /**
  * Fetches search results from xgif.cc for a performer name,
- * and picks a random clip code from the pool (excluding excludeCode if given).
+ * and picks a random clip code from the pool.
+ * If candidate clip is deleted/invalid, automatically rolls again to next candidate!
  */
 export async function fetchRandomRewardClip(
   query: string,
@@ -110,8 +162,26 @@ export async function fetchRandomRewardClip(
       }
     }
 
-    // Pick random code from candidate pool
-    const selectedCode = candidatePool[Math.floor(Math.random() * candidatePool.length)];
+    // Shuffle the candidates to ensure randomness
+    const shuffled = [...candidatePool].sort(() => Math.random() - 0.5);
+
+    // Auto-roll check: verify candidate is alive. If dead, immediately roll to next!
+    const token = await getRedGifsToken();
+    let selectedCode: string | null = null;
+
+    // Check up to 5 candidates from the shuffled pool
+    for (const candidate of shuffled.slice(0, 5)) {
+      const alive = await isClipAlive(candidate, token);
+      if (alive) {
+        selectedCode = candidate;
+        break;
+      }
+    }
+
+    // If all checked candidates were somehow marked dead or check failed, fallback to first
+    if (!selectedCode) {
+      selectedCode = shuffled[0];
+    }
 
     return {
       ok: true,

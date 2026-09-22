@@ -6,7 +6,6 @@ interface RewardClipModalProps {
   characterName: string;
   initialCode: string;
   initialPool?: string[];
-  durationSeconds?: number;
   onClose: () => void;
 }
 
@@ -14,7 +13,6 @@ export default function RewardClipModal({
   characterName,
   initialCode,
   initialPool = [],
-  durationSeconds = 10,
   onClose,
 }: RewardClipModalProps) {
   const [currentCode, setCurrentCode] = useState(initialCode);
@@ -22,76 +20,46 @@ export default function RewardClipModal({
     const list = initialPool.length > 0 ? initialPool : [initialCode];
     return Array.from(new Set(list));
   });
-  const [timeLeft, setTimeLeft] = useState(durationSeconds);
   const [isRolling, setIsRolling] = useState(false);
 
   const seenCodesRef = useRef<Set<string>>(new Set([initialCode.toLowerCase()]));
 
-  // Handle Roll Again
+  // Handle Roll Again (fetches a verified-alive random clip from backend, with local pool fallback)
   const handleRollAgain = useCallback(async () => {
+    if (isRolling) return;
     setIsRolling(true);
 
-    // 1. Try to find a candidate from the local pool that hasn't been seen recently
-    const unseenCandidates = pool.filter(
-      (c) => c.toLowerCase() !== currentCode.toLowerCase() && !seenCodesRef.current.has(c.toLowerCase())
-    );
-
-    let nextCode: string | null = null;
-
-    if (unseenCandidates.length > 0) {
-      nextCode = unseenCandidates[Math.floor(Math.random() * unseenCandidates.length)];
-    } else {
-      // If all seen, pick any other code in the pool
-      const otherCandidates = pool.filter((c) => c.toLowerCase() !== currentCode.toLowerCase());
-      if (otherCandidates.length > 0) {
-        nextCode = otherCandidates[Math.floor(Math.random() * otherCandidates.length)];
-      }
-    }
-
-    if (nextCode) {
-      seenCodesRef.current.add(nextCode.toLowerCase());
-      setCurrentCode(nextCode);
-      setTimeLeft(durationSeconds);
-      setIsRolling(false);
-      return;
-    }
-
-    // 2. If pool has no alternatives, fetch live from server
     try {
       const res = await apiClient.getRandomRewardClip(characterName, currentCode);
-      if (res.ok && res.code) {
-        setCurrentCode(res.code);
+      if (res.ok && res.code && res.code.toLowerCase() !== currentCode.toLowerCase()) {
         seenCodesRef.current.add(res.code.toLowerCase());
+        setCurrentCode(res.code);
         if (res.pool && res.pool.length > 0) {
           setPool((prev) => Array.from(new Set([...prev, ...(res.pool || [])])));
         }
-        setTimeLeft(durationSeconds);
+        setIsRolling(false);
+        return;
       }
     } catch (err) {
-      console.warn('[RewardClipModal] Failed to roll new clip', err);
-    } finally {
-      setIsRolling(false);
+      console.warn('[RewardClipModal] Server roll failed, trying local pool fallback', err);
     }
-  }, [characterName, currentCode, durationSeconds, pool]);
 
-  // 100ms precision countdown timer
-  useEffect(() => {
-    const intervalMs = 100;
-    const decrement = intervalMs / 1000;
+    // Local pool fallback if server is unreachable or returned same code
+    const alternatives = pool.filter(
+      (c) => c.toLowerCase() !== currentCode.toLowerCase() && !seenCodesRef.current.has(c.toLowerCase())
+    );
+    const candidate =
+      alternatives.length > 0
+        ? alternatives[Math.floor(Math.random() * alternatives.length)]
+        : pool.find((c) => c.toLowerCase() !== currentCode.toLowerCase());
 
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= decrement) {
-          clearInterval(timer);
-          onClose();
-          return 0;
-        }
-        return prev - decrement;
-      });
-    }, intervalMs);
+    if (candidate) {
+      seenCodesRef.current.add(candidate.toLowerCase());
+      setCurrentCode(candidate);
+    }
 
-    return () => clearInterval(timer);
-  }, [onClose, currentCode]);
+    setIsRolling(false);
+  }, [characterName, currentCode, isRolling, pool]);
 
   // Lock body scroll and listen for key shortcuts (Space, Enter, Esc to advance, R to roll again)
   useEffect(() => {
@@ -115,8 +83,6 @@ export default function RewardClipModal({
     };
   }, [onClose, handleRollAgain]);
 
-  const progressPercent = Math.max(0, Math.min(100, (timeLeft / durationSeconds) * 100));
-
   return createPortal(
     <div
       className="fixed inset-0 z-[120] flex items-center justify-center bg-black/90 p-3 sm:p-5 backdrop-blur-md animate-in fade-in duration-150"
@@ -139,9 +105,10 @@ export default function RewardClipModal({
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Seconds Badge */}
-            <span className="rounded-lg bg-white/10 px-2 py-1 font-mono text-xs font-semibold text-white/80">
-              ⏱️ {Math.ceil(timeLeft)}s
+            {/* Continuous Loop Badge */}
+            <span className="flex items-center gap-1 rounded-lg bg-white/10 px-2.5 py-1 text-xs font-medium text-white/80">
+              <span className="text-emerald-400">🔁</span>
+              <span>Looping</span>
             </span>
 
             {/* Skip Button */}
@@ -169,14 +136,6 @@ export default function RewardClipModal({
           />
         </div>
 
-        {/* Progress Bar (10s countdown) */}
-        <div className="h-1.5 w-full bg-white/10">
-          <div
-            className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-100 ease-linear"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-
         {/* Bottom Actions Bar */}
         <div className="flex items-center justify-between gap-2 border-t border-white/10 px-4 py-3 sm:px-5 bg-black/40">
           {/* Roll Again Button */}
@@ -184,7 +143,7 @@ export default function RewardClipModal({
             type="button"
             onClick={handleRollAgain}
             disabled={isRolling}
-            className="flex items-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/15 hover:bg-indigo-500/25 px-3 py-1.5 text-xs font-semibold text-indigo-300 transition-all cursor-pointer active:scale-95"
+            className="flex items-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/15 hover:bg-indigo-500/25 px-3 py-1.5 text-xs font-semibold text-indigo-300 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
             title="Show a different clip for this character (Keyboard: R)"
           >
             <span className={isRolling ? 'animate-spin' : ''}>🎲</span>

@@ -247,7 +247,6 @@ function ActiveGame({ state }: { state: GameLocationState }) {
           characterName={game.activeRewardClip.characterName}
           initialCode={game.activeRewardClip.code}
           initialPool={game.activeRewardClip.pool}
-          durationSeconds={10}
           onClose={game.dismissRewardClip}
         />
       )}

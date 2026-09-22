@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { extractClipCodes, fetchRandomRewardClip } from '../lib/rewardClipScraper';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { extractClipCodes, fetchRandomRewardClip, isClipAlive } from '../lib/rewardClipScraper';
 
 describe('rewardClipScraper', () => {
   describe('extractClipCodes', () => {
@@ -46,6 +46,51 @@ describe('rewardClipScraper', () => {
     it('returns empty array when HTML is empty or contains no codes', () => {
       expect(extractClipCodes('')).toEqual([]);
       expect(extractClipCodes('<div>No results found for query</div>')).toEqual([]);
+    });
+  });
+
+  describe('isClipAlive validation', () => {
+    const originalFetch = globalThis.fetch;
+
+    afterEach(() => {
+      globalThis.fetch = originalFetch;
+    });
+
+    it('returns true if token or code is missing (safe default)', async () => {
+      expect(await isClipAlive('', 'token')).toBe(true);
+      expect(await isClipAlive('FondShadowyBellfrog', null)).toBe(true);
+    });
+
+    it('returns false when RedGIFs responds with 404 or 410', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        status: 404,
+        ok: false,
+      } as Response);
+
+      const alive = await isClipAlive('FondShadowyBellfrog', 'test-token');
+      expect(alive).toBe(false);
+    });
+
+    it('returns false when RedGIFs returns error code GifDeleted', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: async () => ({ error: { code: 'GifDeleted' } }),
+      } as Response);
+
+      const alive = await isClipAlive('FondShadowyBellfrog', 'test-token');
+      expect(alive).toBe(false);
+    });
+
+    it('returns true when RedGIFs returns active gif payload', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: async () => ({ gif: { id: 'FondShadowyBellfrog' } }),
+      } as Response);
+
+      const alive = await isClipAlive('FondShadowyBellfrog', 'test-token');
+      expect(alive).toBe(true);
     });
   });
 
