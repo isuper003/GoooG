@@ -10,6 +10,7 @@ import { crawlerRouter } from './routes/crawler';
 import { proxyRouter } from './routes/proxy';
 import { reviewRouter } from './routes/review';
 import { data18Router } from './routes/data18';
+import { watchRouter } from './routes/watch';
 
 export type AppEnv = {
   Bindings: {
@@ -57,4 +58,5 @@ app.route('/api/crawler', crawlerRouter);
 app.route('/api/image-proxy', proxyRouter);
 app.route('/api/review', reviewRouter);
 app.route('/api/data18', data18Router);
+app.route('/api/watch', watchRouter);
 

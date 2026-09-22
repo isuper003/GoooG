@@ -242,7 +242,40 @@ export const apiClient = {
 
   searchPornPics: (name: string) =>
     request<Data18PornPicsResult>(`/api/data18/pornpics?name=${encodeURIComponent(name)}`),
+
+  scrapeWatchVideos: (query: string) =>
+    request<WatchScrapeResponse>(`/api/watch/search?q=${encodeURIComponent(query)}`),
 };
+
+export interface ScrapedWatchVideo {
+  id: string;
+  siteId: string;
+  siteName: string;
+  siteDomain: string;
+  badgeColor: string;
+  title: string;
+  url: string;
+  thumbUrl: string;
+  duration?: string;
+}
+
+export interface SiteScrapeStatus {
+  siteId: string;
+  siteName: string;
+  siteDomain: string;
+  badgeColor: string;
+  count: number;
+  status: 'success' | 'empty' | 'error' | 'timeout';
+  error?: string;
+  directSearchUrl: string;
+}
+
+export interface WatchScrapeResponse {
+  query: string;
+  videos: ScrapedWatchVideo[];
+  siteStatuses: SiteScrapeStatus[];
+  totalFound: number;
+}
 
 interface CrawledItem {
   name: string;
