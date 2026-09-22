@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Canvas -->
+    <linearGradient id="mBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#090d14"/>
+      <stop offset="50%" stop-color="#04060a"/>
+      <stop offset="100%" stop-color="#020306"/>
+    </linearGradient>
+
+    <!-- Cyan Glow -->
+    <radialGradient id="mCyanGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00f0ff" stop-opacity="0.25"/>
+      <stop offset="60%" stop-color="#0077ff" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="mBorderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f0ff" stop-opacity="0.8"/>
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.5"/>
+    </linearGradient>
+
+    <linearGradient id="mGGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="80%" stop-color="#e2e8f0"/>
+      <stop offset="100%" stop-color="#94a3b8"/>
+    </linearGradient>
+
+    <filter id="mShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#00f0ff" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Solid Edge-to-edge Background for Safe Masking -->
+  <rect width="512" height="512" fill="url(#mBgGrad)"/>
+
+  <!-- Ambient Center Glow -->
+  <circle cx="256" cy="256" r="200" fill="url(#mCyanGlow)"/>
+
+  <!-- Scaled content centered within the 80% safe zone (center 410x410) -->
+  <g transform="translate(51.2, 51.2) scale(0.8)">
+    <!-- Inner Squircle Box -->
+    <rect x="56" y="56" width="400" height="400" rx="88" fill="#090d14" fill-opacity="0.75" stroke="url(#mBorderGrad)" stroke-width="5"/>
+
+    <!-- Corner Accents -->
+    <line x1="88" y1="120" x2="88" y2="88" stroke="#00f0ff" stroke-width="3" stroke-linecap="round"/>
+    <line x1="88" y1="88" x2="120" y2="88" stroke="#00f0ff" stroke-width="3" stroke-linecap="round"/>
+    <line x1="424" y1="392" x2="424" y2="424" stroke="#00f0ff" stroke-width="3" stroke-linecap="round"/>
+    <line x1="424" y1="424" x2="392" y2="424" stroke="#00f0ff" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Stylized Geometric "G" Mark -->
+    <g filter="url(#mShadow)">
+      <path d="M 336 180
+               C 310 148 270 136 230 144
+               C 172 156 136 208 136 266
+               C 136 326 178 376 240 376
+               C 300 376 348 334 356 276
+               L 248 276
+               A 12 12 0 0 1 248 252
+               L 372 252
+               C 378 252 384 258 382 266
+               C 372 350 310 404 238 404
+               C 156 404 104 338 104 264
+               C 104 186 156 116 234 116
+               C 284 116 332 136 362 172
+               Z"
+            fill="url(#mGGrad)"/>
+      <circle cx="256" cy="264" r="8" fill="#00f0ff"/>
+      <circle cx="364" cy="204" r="7" fill="#00f0ff"/>
+    </g>
+  </g>
+</svg>

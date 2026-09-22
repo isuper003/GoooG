@@ -5,6 +5,8 @@ import { useReviewQueues } from './hooks/useReview';
 import FullscreenButton from './components/ui/FullscreenButton';
 import RandomShowcaseModal from './components/showcase/RandomShowcaseModal';
 import MobileNavDrawer from './components/ui/MobileNavDrawer';
+import { usePWAInstall } from './hooks/usePWAInstall';
+import PWAInstallModal from './components/pwa/PWAInstallModal';
 
 const navItems = [
   { to: '/', label: 'Spotlight' },
@@ -22,6 +24,14 @@ export default function App() {
   const dueCount = reviewQueues?.due?.count ?? 0;
   const [isRandomOpen, setIsRandomOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const {
+    isInstallable,
+    isInstalled,
+    isIOS,
+    isGuideOpen,
+    setIsGuideOpen,
+    promptInstall,
+  } = usePWAInstall();
 
   useEffect(() => {
     const handleOpen = () => setIsRandomOpen(true);
@@ -123,6 +133,25 @@ export default function App() {
               </svg>
             </button>
 
+            {/* PWA Install Header Button */}
+            {!isInstalled && (isInstallable || isIOS) && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (isInstallable && !isIOS) {
+                    promptInstall();
+                  } else {
+                    setIsGuideOpen(true);
+                  }
+                }}
+                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-400/10 hover:bg-cyan-400/20 text-cyan-300 border border-cyan-400/30 hover:border-cyan-400/50 text-xs font-mono font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
+                title="Install GoooG as Web App"
+              >
+                <span>📲</span>
+                <span>Install App</span>
+              </button>
+            )}
+
             <FullscreenButton variant="header" />
           </div>
 
@@ -142,12 +171,24 @@ export default function App() {
         dueCount={dueCount}
         activeCount={activeCount}
         onOpenRandom={() => setIsRandomOpen(true)}
+        onOpenInstall={() => setIsGuideOpen(true)}
+        isInstalled={isInstalled}
       />
 
       {/* Floating Random Showcase Overlay */}
       <RandomShowcaseModal
         isOpen={isRandomOpen}
         onClose={() => setIsRandomOpen(false)}
+      />
+
+      {/* PWA Installation & Guidance Modal */}
+      <PWAInstallModal
+        isOpen={isGuideOpen}
+        onClose={() => setIsGuideOpen(false)}
+        onInstall={promptInstall}
+        isIOS={isIOS}
+        isInstallable={isInstallable}
+        isInstalled={isInstalled}
       />
     </div>
   );

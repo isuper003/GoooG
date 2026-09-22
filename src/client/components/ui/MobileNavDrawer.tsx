@@ -14,6 +14,8 @@ interface MobileNavDrawerProps {
   dueCount: number;
   activeCount: number;
   onOpenRandom: () => void;
+  onOpenInstall?: () => void;
+  isInstalled?: boolean;
 }
 
 const NAV_ICONS: Record<string, string> = {
@@ -32,6 +34,8 @@ export default function MobileNavDrawer({
   dueCount,
   activeCount,
   onOpenRandom,
+  onOpenInstall,
+  isInstalled = false,
 }: MobileNavDrawerProps) {
   const location = useLocation();
 
@@ -176,7 +180,27 @@ export default function MobileNavDrawer({
             </div>
 
             {/* Bottom Actions Section */}
-            <div className="flex flex-col gap-3 pt-4 border-t border-white/[0.08]">
+            <div className="flex flex-col gap-2.5 pt-4 border-t border-white/[0.08]">
+              {/* PWA Install Trigger */}
+              {!isInstalled && onOpenInstall && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenInstall();
+                  }}
+                  className="w-full py-2.5 px-3.5 rounded-xl bg-gradient-to-r from-cyan-500/20 via-cyan-400/10 to-blue-500/10 hover:from-cyan-500/30 hover:to-blue-500/20 text-cyan-300 border border-cyan-400/30 hover:border-cyan-400/50 font-mono text-xs font-semibold flex items-center justify-between transition-all cursor-pointer shadow-sm active:scale-98"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">📲</span>
+                    <span>Install GoooG App</span>
+                  </div>
+                  <span className="px-1.5 py-0.5 rounded bg-cyan-400/20 border border-cyan-400/40 text-[10px] font-bold">
+                    PWA
+                  </span>
+                </button>
+              )}
+
               {/* Random Showcase Trigger */}
               <button
                 type="button"

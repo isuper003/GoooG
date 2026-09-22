@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json.schemastore.org/web-manifest-combined.json",
+  "id": "/?source=pwa",
+  "name": "GoooG — Visual Recognition Studio",
+  "short_name": "GoooG",
+  "description": "Visual recognition training studio, spaced repetition mastery, and media gallery.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#04060a",
+  "theme_color": "#04060a",
+  "categories": ["games", "entertainment", "education", "utilities"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Arena — Train Now",
+      "short_name": "Arena",
+      "description": "Jump straight into the active training round",
+      "url": "/play",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Character Gallery",
+      "short_name": "Gallery",
+      "description": "Browse and organize your character roster",
+      "url": "/gallery",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Data18 Explorer",
+      "short_name": "Data18",
+      "description": "Explore performers, scenes, and what's new",
+      "url": "/data18",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}
