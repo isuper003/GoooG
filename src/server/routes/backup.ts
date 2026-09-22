@@ -421,142 +421,210 @@ backupRouter.post('/import', zValidator('json', fullBackupImportSchema), async (
     labelNameToId.set(l.name.toLowerCase(), l.id);
   }
 
-  // 4. Insert or Merge Characters
-  let importedCharsCount = 0;
+  // 4. Insert or Merge Characters.
+  //
+  // A real library-sized backup (hundreds of characters, each with several images) would
+  // previously drive one round trip per character just to check for a merge match, plus
+  // another to insert/update it, plus one more per image and per label — easily 1,000+
+  // sequential awaited D1 calls for a 150-character backup. That routinely runs past
+  // Cloudflare's request time budget and fails the import midway. Everything below is
+  // instead resolved with a handful of bulk reads and writes executed via `db.batch(...)`.
+  const now = new Date().toISOString();
+  const BATCH_SIZE = 50;
+  const charKey = (categoryId: number, name: string) => `${categoryId}::${name.trim().toLowerCase()}`;
+
+  interface PendingChar {
+    input: (typeof characters)[number];
+    catId: number;
+    charId: number | null;
+  }
+
+  const existingCharRows =
+    mode === 'merge'
+      ? await queryAll<{ id: number; name: string; category_id: number }>(
+          db,
+          'SELECT id, name, category_id FROM characters'
+        )
+      : [];
+  const existingCharMap = new Map<string, number>();
+  for (const row of existingCharRows) {
+    existingCharMap.set(charKey(row.category_id, row.name), row.id);
+  }
+
+  // One pending entry per input character, always keeping that character's own images/labels —
+  // even when its (category, name) key is shared with an earlier entry in this same payload
+  // (both then resolve to the same charId below, but each still contributes its own images).
+  // `pendingNewByKey` tracks only which key gets the actual INSERT, so a name duplicated
+  // within one backup file still creates a single character row rather than two.
+  const pending: PendingChar[] = [];
+  const pendingNewByKey = new Map<string, PendingChar>();
   for (const char of characters) {
     const catId = catKeyToId.get(char.categoryKey) ?? 1;
-    const isActiveNum = char.isActive ? 1 : 0;
-    const isLeechNum = char.isLeech ? 1 : 0;
-    const now = new Date().toISOString();
-
-    let charId: number | null = null;
-
-    if (mode === 'merge') {
-      const existing = await queryOne<{ id: number }>(
-        db,
-        'SELECT id FROM characters WHERE category_id = ? AND name = ? COLLATE NOCASE',
-        catId,
-        char.name
-      );
-      if (existing) {
-        charId = existing.id;
-        await db
-          .prepare(
-            `UPDATE characters SET
-              correct_count = MAX(correct_count, ?),
-              wrong_count = MAX(wrong_count, ?),
-              srs_level = ?,
-              is_active = ?,
-              next_review_at = COALESCE(?, next_review_at),
-              last_reviewed_at = COALESCE(?, last_reviewed_at),
-              interval_hours = COALESCE(?, interval_hours),
-              is_leech = ?,
-              leech_streak = ?,
-              updated_at = ?
-            WHERE id = ?`
-          )
-          .bind(
-            char.correctCount,
-            char.wrongCount,
-            char.srsLevel,
-            isActiveNum,
-            char.nextReviewAt ?? null,
-            char.lastReviewedAt ?? null,
-            char.intervalHours ?? null,
-            isLeechNum,
-            char.leechStreak,
-            now,
-            charId
-          )
-          .run();
-      }
+    const key = charKey(catId, char.name);
+    const matchedId = existingCharMap.get(key) ?? null;
+    const entry: PendingChar = { input: char, catId, charId: matchedId };
+    pending.push(entry);
+    if (matchedId === null && !pendingNewByKey.has(key)) {
+      pendingNewByKey.set(key, entry);
     }
+  }
 
-    if (!charId) {
-      await db
+  // 4a. Batch-update existing merge matches.
+  const updateStmts: D1PreparedStatement[] = pending
+    .filter((p) => p.charId !== null)
+    .map((p) => {
+      const char = p.input;
+      return db
         .prepare(
-          `INSERT INTO characters (
-            name, category_id, correct_count, wrong_count, srs_level, is_active,
-            next_review_at, last_reviewed_at, interval_hours, is_leech, leech_streak,
-            created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `UPDATE characters SET
+            correct_count = MAX(correct_count, ?),
+            wrong_count = MAX(wrong_count, ?),
+            srs_level = ?,
+            is_active = ?,
+            next_review_at = COALESCE(?, next_review_at),
+            last_reviewed_at = COALESCE(?, last_reviewed_at),
+            interval_hours = COALESCE(?, interval_hours),
+            is_leech = ?,
+            leech_streak = ?,
+            updated_at = ?
+          WHERE id = ?`
         )
         .bind(
-          char.name,
-          catId,
           char.correctCount,
           char.wrongCount,
           char.srsLevel,
-          isActiveNum,
+          char.isActive ? 1 : 0,
           char.nextReviewAt ?? null,
           char.lastReviewedAt ?? null,
           char.intervalHours ?? null,
-          isLeechNum,
+          char.isLeech ? 1 : 0,
           char.leechStreak,
-          char.createdAt ?? now,
-          char.updatedAt ?? now
-        )
-        .run();
-
-      const created = await queryOne<{ id: number }>(
-        db,
-        'SELECT id FROM characters WHERE category_id = ? AND name = ? COLLATE NOCASE',
-        catId,
-        char.name
-      );
-      charId = created?.id ?? null;
-      importedCharsCount++;
-    }
-
-    if (charId) {
-      // Images. `character_images` has UNIQUE(character_id, position) as well as
-      // UNIQUE(character_id, url), so re-inserting an existing character's images at
-      // their originally-exported positions (which start at 0) would silently collide
-      // with that character's current images and get dropped by INSERT OR IGNORE —
-      // merge mode would then add no new photos to a character that already has any.
-      // Instead, skip images the character already has (by URL) and slot the rest into
-      // the next free position.
-      if (char.images && char.images.length > 0) {
-        const existingImages = await queryAll<{ url: string; position: number }>(
-          db,
-          'SELECT url, position FROM character_images WHERE character_id = ?',
-          charId
+          now,
+          p.charId
         );
-        const existingUrls = new Set(existingImages.map((row) => row.url));
-        const usedPositions = new Set(existingImages.map((row) => row.position));
-        let nextFreePosition =
-          existingImages.length > 0 ? Math.max(...existingImages.map((row) => row.position)) + 1 : 0;
+    });
+  for (let i = 0; i < updateStmts.length; i += BATCH_SIZE) {
+    await db.batch(updateStmts.slice(i, i + BATCH_SIZE));
+  }
 
-        for (const img of char.images) {
-          if (existingUrls.has(img.url)) continue;
+  // 4b. Batch-insert genuinely new characters (deduped, see above).
+  const toInsert = Array.from(pendingNewByKey.values());
+  const insertStmts: D1PreparedStatement[] = toInsert.map((p) => {
+    const char = p.input;
+    return db
+      .prepare(
+        `INSERT INTO characters (
+          name, category_id, correct_count, wrong_count, srs_level, is_active,
+          next_review_at, last_reviewed_at, interval_hours, is_leech, leech_streak,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        char.name,
+        p.catId,
+        char.correctCount,
+        char.wrongCount,
+        char.srsLevel,
+        char.isActive ? 1 : 0,
+        char.nextReviewAt ?? null,
+        char.lastReviewedAt ?? null,
+        char.intervalHours ?? null,
+        char.isLeech ? 1 : 0,
+        char.leechStreak,
+        char.createdAt ?? now,
+        char.updatedAt ?? now
+      );
+  });
+  for (let i = 0; i < insertStmts.length; i += BATCH_SIZE) {
+    await db.batch(insertStmts.slice(i, i + BATCH_SIZE));
+  }
+  const importedCharsCount = toInsert.length;
 
-          const position = usedPositions.has(img.position) ? nextFreePosition : img.position;
-          usedPositions.add(position);
-          nextFreePosition = Math.max(nextFreePosition, position + 1);
-          existingUrls.add(img.url);
+  // Resolve ids for every pending entry still missing one — the just-inserted rows, and any
+  // duplicate entries that share a key with one of them — in one pass instead of one SELECT
+  // per insert.
+  const unresolved = pending.filter((p) => p.charId === null);
+  if (unresolved.length > 0) {
+    const refreshed = await queryAll<{ id: number; name: string; category_id: number }>(
+      db,
+      'SELECT id, name, category_id FROM characters'
+    );
+    const refreshedMap = new Map<string, number>();
+    for (const row of refreshed) {
+      refreshedMap.set(charKey(row.category_id, row.name), row.id);
+    }
+    for (const p of unresolved) {
+      p.charId = refreshedMap.get(charKey(p.catId, p.input.name)) ?? null;
+    }
+  }
 
-          await db
-            .prepare(
-              'INSERT OR IGNORE INTO character_images (character_id, url, position) VALUES (?, ?, ?)'
-            )
-            .bind(charId, img.url, position)
-            .run();
-        }
-      }
+  // 4c. Images for every input character, batched across the whole payload. `character_images`
+  // has UNIQUE(character_id, position) as well as UNIQUE(character_id, url), so re-inserting an
+  // existing character's images at their originally-exported positions (which start at 0) would
+  // collide with that character's current images and get silently dropped by INSERT OR IGNORE —
+  // merge mode would then add no new photos to a character that already has any. Instead, skip
+  // images the character already has (by URL) and slot the rest into the next free position.
+  const allExistingImages = await queryAll<{ character_id: number; url: string; position: number }>(
+    db,
+    'SELECT character_id, url, position FROM character_images'
+  );
+  interface ImageBucket {
+    urls: Set<string>;
+    usedPositions: Set<number>;
+    nextFree: number;
+  }
+  const imagesByChar = new Map<number, ImageBucket>();
+  const bucketFor = (characterId: number): ImageBucket => {
+    let bucket = imagesByChar.get(characterId);
+    if (!bucket) {
+      bucket = { urls: new Set(), usedPositions: new Set(), nextFree: 0 };
+      imagesByChar.set(characterId, bucket);
+    }
+    return bucket;
+  };
+  for (const row of allExistingImages) {
+    const bucket = bucketFor(row.character_id);
+    bucket.urls.add(row.url);
+    bucket.usedPositions.add(row.position);
+    bucket.nextFree = Math.max(bucket.nextFree, row.position + 1);
+  }
 
-      // Labels
-      if (char.labelNames && char.labelNames.length > 0) {
-        for (const lName of char.labelNames) {
-          const lId = labelNameToId.get(lName.toLowerCase());
-          if (lId) {
-            await db
-              .prepare('INSERT OR IGNORE INTO character_labels (character_id, label_id) VALUES (?, ?)')
-              .bind(charId, lId)
-              .run();
-          }
-        }
+  const imageStmts: D1PreparedStatement[] = [];
+  for (const p of pending) {
+    if (!p.charId || !p.input.images || p.input.images.length === 0) continue;
+    const bucket = bucketFor(p.charId);
+    for (const img of p.input.images) {
+      if (bucket.urls.has(img.url)) continue;
+      const position = bucket.usedPositions.has(img.position) ? bucket.nextFree : img.position;
+      bucket.usedPositions.add(position);
+      bucket.nextFree = Math.max(bucket.nextFree, position + 1);
+      bucket.urls.add(img.url);
+      imageStmts.push(
+        db
+          .prepare('INSERT OR IGNORE INTO character_images (character_id, url, position) VALUES (?, ?, ?)')
+          .bind(p.charId, img.url, position)
+      );
+    }
+  }
+  for (let i = 0; i < imageStmts.length; i += BATCH_SIZE) {
+    await db.batch(imageStmts.slice(i, i + BATCH_SIZE));
+  }
+
+  // 4d. Labels for every input character, batched the same way.
+  const characterLabelStmts: D1PreparedStatement[] = [];
+  for (const p of pending) {
+    if (!p.charId || !p.input.labelNames || p.input.labelNames.length === 0) continue;
+    for (const lName of p.input.labelNames) {
+      const lId = labelNameToId.get(lName.toLowerCase());
+      if (lId) {
+        characterLabelStmts.push(
+          db.prepare('INSERT OR IGNORE INTO character_labels (character_id, label_id) VALUES (?, ?)').bind(p.charId, lId)
+        );
       }
     }
+  }
+  for (let i = 0; i < characterLabelStmts.length; i += BATCH_SIZE) {
+    await db.batch(characterLabelStmts.slice(i, i + BATCH_SIZE));
   }
 
   // Reload character name -> id for resolving game answers
@@ -731,7 +799,11 @@ backupRouter.post('/import', zValidator('json', fullBackupImportSchema), async (
     ok: true,
     mode,
     imported: {
-      characters: characters.length,
+      // Genuinely new rows, not the raw submitted count: a name repeated in the payload,
+      // or one that already matched an existing character in merge mode, is merged into
+      // one row rather than creating a duplicate — reporting `characters.length` here would
+      // overstate how many characters were actually added.
+      characters: importedCharsCount,
       labels: labels.length,
       gameSessions: gameSessions.length,
       gameAnswers: importedAnswersCount,

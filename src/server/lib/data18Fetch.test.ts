@@ -108,6 +108,15 @@ describe('fetchData18Html persistent cache', () => {
     expect(stats.inserts).toBe(0);
   });
 
+  it('rejects a response whose declared Content-Length exceeds the size cap', async () => {
+    const fetchMock = vi.fn(
+      async () => new Response('short body, lying header', { headers: { 'content-length': String(6 * 1024 * 1024) } })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchData18Html('/name/oversized-declared')).rejects.toBeInstanceOf(Data18Error);
+  });
+
   it('keeps working when the database itself fails', async () => {
     const { db } = fakeDb({}, { failing: true });
     vi.stubGlobal('fetch', vi.fn(async () => new Response(PAGE)));

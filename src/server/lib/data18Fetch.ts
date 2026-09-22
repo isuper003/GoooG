@@ -167,6 +167,17 @@ function statusToError(status: number, url: string): Data18Error {
 async function fetchOnce(url: string, headers: Record<string, string>): Promise<string> {
   const res = await fetch(url, { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   if (!res.ok) throw statusToError(res.status, url);
+
+  // MAX_BODY_BYTES was previously only enforced in the Node dev fallback below — this is the
+  // primary path in the actual Workers runtime, so a declared oversized body needs the same
+  // guard here. A spoofed/missing Content-Length still gets through (there's no way to cap a
+  // Response's `.text()` read by byte count without manually draining the stream), but this
+  // catches the common case cheaply, before spending time/memory buffering the whole body.
+  const declaredLength = Number(res.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+    throw new Data18Error(`Data18 response too large (${declaredLength} bytes) for ${url}`, 502);
+  }
+
   return await res.text();
 }
 

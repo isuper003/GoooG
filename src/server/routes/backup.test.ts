@@ -363,7 +363,7 @@ function fakeDb() {
       all: async () => {
         if (sql.includes('FROM categories')) return { results: categories };
         if (sql.includes('FROM labels')) return { results: labels };
-        if (sql.includes('FROM characters ORDER BY id ASC')) return { results: characters };
+        if (sql.includes('FROM characters')) return { results: characters };
         if (sql.includes('FROM character_images')) {
           if (sql.includes('WHERE character_id = ?')) {
             const [characterId] = args as [number];
@@ -646,6 +646,73 @@ describe('backupRouter', () => {
     // The new image must not have collided with the occupied position 0.
     const newImage = state.characterImages.find((ci) => ci.url === 'https://example.com/new.jpg');
     expect(newImage?.position).not.toBe(0);
+  });
+
+  it('batch-imports multiple new characters and dedupes a name repeated in the payload', async () => {
+    const state = fakeDb();
+    const app = makeApp(state.db);
+
+    const makeChar = (name: string, images: { url: string; position: number }[]) => ({
+      name,
+      categoryKey: 'sluts' as const,
+      correctCount: 0,
+      wrongCount: 0,
+      srsLevel: 0,
+      isActive: true,
+      isLeech: false,
+      leechStreak: 0,
+      images,
+      labelNames: [],
+    });
+
+    const sampleBackup: FullAppBackup = {
+      version: 1,
+      app: 'GoooG',
+      exportedAt: new Date().toISOString(),
+      summary: {
+        charactersCount: 3,
+        labelsCount: 0,
+        gameSessionsCount: 0,
+        gameAnswersCount: 0,
+        data18FavoritesCount: 0,
+        data18WatchLaterCount: 0,
+      },
+      data: {
+        labels: [],
+        characters: [
+          makeChar('Riley Reid', [{ url: 'https://example.com/riley-1.jpg', position: 0 }]),
+          makeChar('Mia Malkova', [{ url: 'https://example.com/mia-1.jpg', position: 0 }]),
+          // Same name+category as the first entry, with a different, non-overlapping image —
+          // should merge into the same row rather than creating a second "Riley Reid".
+          makeChar('riley reid', [{ url: 'https://example.com/riley-2.jpg', position: 0 }]),
+        ],
+        gameSessions: [],
+        data18Favorites: [],
+        data18WatchLater: [],
+      },
+    };
+
+    const res = await app.request('/api/backup/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'merge', backup: sampleBackup }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { imported: { characters: number } };
+    // Only 2 distinct characters were actually created.
+    expect(body.imported.characters).toBe(2);
+    expect(state.characters).toHaveLength(2);
+    expect(state.characters.map((c) => c.name).sort()).toEqual(['Mia Malkova', 'Riley Reid']);
+
+    const riley = state.characters.find((c) => c.name === 'Riley Reid')!;
+    const rileyImages = state.characterImages.filter((ci) => ci.character_id === riley.id);
+    expect(rileyImages.map((i) => i.url).sort()).toEqual([
+      'https://example.com/riley-1.jpg',
+      'https://example.com/riley-2.jpg',
+    ]);
+    // Both entries exported at position 0 — the second must not have been dropped.
+    expect(new Set(rileyImages.map((i) => i.position)).size).toBe(2);
   });
 
   it('rejects invalid or corrupted backup payloads', async () => {

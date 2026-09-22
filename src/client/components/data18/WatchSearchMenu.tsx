@@ -216,7 +216,6 @@ export default function WatchSearchMenu({
 }: WatchSearchMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'scraped' | 'direct'>('scraped');
-  const [selectedSiteFilter, setSelectedSiteFilter] = useState<string>('all');
   const [copied, setCopied] = useState(false);
 
   // Clean titles
@@ -290,6 +289,33 @@ export default function WatchSearchMenu({
   const [draggedTokenIndex, setDraggedTokenIndex] = useState<number | null>(null);
   const [dragOverTokenIndex, setDragOverTokenIndex] = useState<number | null>(null);
 
+  // Scraper state
+  const [isLoadingScrape, setIsLoadingScrape] = useState(false);
+  const [videos, setVideos] = useState<ScrapedWatchVideo[]>([]);
+  const [siteStatuses, setSiteStatuses] = useState<SiteScrapeStatus[]>([]);
+  const [hasScraped, setHasScraped] = useState(false);
+  const [scrapeError, setScrapeError] = useState<string | null>(null);
+  const [selectedSiteFilter, setSelectedSiteFilter] = useState<string>('all');
+
+  // Defensive resync: `activeTokens` and the scrape results are seeded once from the
+  // initial title. Today every caller keys this component by scene/movie id so a title
+  // change always remounts it — but if that ever stops being true (e.g. this menu gets
+  // reused as a persistent singleton), a prop change alone wouldn't otherwise clear out
+  // the previous scene's chips and search results. Re-derive both whenever the underlying
+  // title identity changes, so this stays correct even without a remount.
+  useEffect(() => {
+    setActiveTokens(availableTokens.length > 0 ? [availableTokens[0]] : []);
+    setExtraKeywords('');
+    setVideos([]);
+    setSiteStatuses([]);
+    setHasScraped(false);
+    setScrapeError(null);
+    setSelectedSiteFilter('all');
+    setActiveTab('scraped');
+    // Only the title identity should trigger a reset — availableTokens is derived from it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cleanedSceneTitle, cleanedMovieTitle]);
+
   // Compute effective search query string from ordered tokens + extra keywords
   const effectiveQuery = useMemo(() => {
     const tokenParts = activeTokens.map((t) => t.value.trim()).filter(Boolean);
@@ -298,13 +324,6 @@ export default function WatchSearchMenu({
     }
     return tokenParts.join(' ').trim();
   }, [activeTokens, extraKeywords]);
-
-  // Scraper state
-  const [isLoadingScrape, setIsLoadingScrape] = useState(false);
-  const [videos, setVideos] = useState<ScrapedWatchVideo[]>([]);
-  const [siteStatuses, setSiteStatuses] = useState<SiteScrapeStatus[]>([]);
-  const [hasScraped, setHasScraped] = useState(false);
-  const [scrapeError, setScrapeError] = useState<string | null>(null);
 
   const searchReqIdRef = useRef(0);
 

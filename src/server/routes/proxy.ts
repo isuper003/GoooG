@@ -48,11 +48,18 @@ proxyRouter.get('/', async (c) => {
       return c.text(`Upstream image error (${upstreamRes.status})`, upstreamRes.status as 400);
     }
 
-    const contentType = upstreamRes.headers.get('content-type') || '';
+    const contentType = (upstreamRes.headers.get('content-type') || '').toLowerCase();
     // This endpoint only ever serves images — without this check it would act as an
     // open relay for arbitrary content (HTML/JS) served under this app's own origin.
-    if (!contentType.toLowerCase().startsWith('image/')) {
+    if (!contentType.startsWith('image/')) {
       return c.text('Upstream response was not an image', 400);
+    }
+    // SVG is XML that can embed <script>; browsers execute it when the response is loaded
+    // directly (e.g. an <iframe>/<object>, or a viewer navigating straight to this URL),
+    // which would run under this app's own origin. Every real gallery image here is a
+    // raster format (JPG/PNG/WEBP/AVIF), so SVG has no legitimate use through this proxy.
+    if (contentType.startsWith('image/svg+xml')) {
+      return c.text('SVG responses are not relayed by this proxy', 400);
     }
 
     return new Response(upstreamRes.body, {
@@ -61,6 +68,8 @@ proxyRouter.get('/', async (c) => {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=604800, s-maxage=604800, immutable',
         'Access-Control-Allow-Origin': '*',
+        // Defense in depth: never let the browser guess its way into treating this as HTML.
+        'X-Content-Type-Options': 'nosniff',
       },
     });
   } catch (err: unknown) {
