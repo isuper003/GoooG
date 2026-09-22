@@ -7,11 +7,13 @@ import EntitySearchBar from '../components/data18/EntitySearchBar';
 import EntityDetailView from '../components/data18/EntityDetailView';
 import FollowingFeed from '../components/data18/FollowingFeed';
 import { InfiniteMovieList, InfiniteSceneList } from '../components/data18/InfiniteLists';
+import WatchLaterView from '../components/data18/WatchLaterView';
+import { useData18WatchLater } from '../hooks/useData18WatchLater';
 import ImageLightbox from '../components/gallery/ImageLightbox';
 
-type Data18Mode = 'scenes' | 'upcoming' | 'movies' | 'performers' | 'studios' | 'following';
+type Data18Mode = 'scenes' | 'upcoming' | 'movies' | 'performers' | 'studios' | 'following' | 'watch-later';
 
-const MODES: Data18Mode[] = ['scenes', 'upcoming', 'movies', 'performers', 'studios', 'following'];
+const MODES: Data18Mode[] = ['scenes', 'upcoming', 'movies', 'performers', 'studios', 'following', 'watch-later'];
 
 const POPULAR_PERFORMERS = [
   { name: 'Cory Chase', slug: 'cory-chase' },
@@ -52,6 +54,8 @@ export default function Data18Page() {
   const entityTab: 'scenes' | 'movies' = params.get('etab') === 'movies' ? 'movies' : 'scenes';
 
   const entityQuery = useData18Entity(entityPath, entityPage, entityTab);
+  const watchLaterQuery = useData18WatchLater();
+  const unwatchedCount = watchLaterQuery.data?.stats.unwatched ?? 0;
 
   function update(changes: Record<string, string | null>) {
     const next = new URLSearchParams(params);
@@ -108,6 +112,7 @@ export default function Data18Page() {
               ['performers', '⭐', 'By Performer', 'bg-white text-black shadow-md'],
               ['studios', '🏢', 'By Studio / Series', 'bg-rose-400 text-black shadow-md'],
               ['following', '💜', 'Following', 'bg-violet-400 text-black shadow-md'],
+              ['watch-later', '🕒', 'Watch Later', 'bg-cyan-400 text-black shadow-md shadow-cyan-400/20'],
             ] as const
           ).map(([key, icon, label, activeClass]) => (
             <button
@@ -120,6 +125,17 @@ export default function Data18Page() {
             >
               <span>{icon}</span>
               <span>{label}</span>
+              {key === 'watch-later' && unwatchedCount > 0 && (
+                <span
+                  className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] font-mono font-bold leading-none ${
+                    mode === 'watch-later' && !entityPath
+                      ? 'bg-black text-cyan-300'
+                      : 'bg-cyan-400/25 text-cyan-300 border border-cyan-400/40'
+                  }`}
+                >
+                  {unwatchedCount}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -160,6 +176,8 @@ export default function Data18Page() {
             onZoomImage={setLightboxImage}
           />
         )
+      ) : mode === 'watch-later' ? (
+        <WatchLaterView onZoomImage={setLightboxImage} />
       ) : mode === 'scenes' || mode === 'upcoming' ? (
         <InfiniteSceneList
           key={`${mode}-${page}`}

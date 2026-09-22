@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import type { Data18Movie } from '../../../shared/data18Types';
 import { toProxiedImageUrl } from '../../lib/imageUrl';
 import { movieHref, studioHref } from '../../lib/data18Nav';
+import WatchLaterButton from './WatchLaterButton';
 
 interface MovieCardProps {
   movie: Data18Movie;
@@ -46,11 +47,23 @@ export default function MovieCard({ movie, onZoomImage }: MovieCardProps) {
             <span />
           )}
 
-          {movie.date ? (
-            <span className="rounded-md bg-black/70 backdrop-blur-md px-2 py-0.5 text-[10px] font-mono text-white/70 border border-white/10 shadow-sm">
-              {movie.date}
-            </span>
-          ) : null}
+          <div className="flex items-center gap-1.5 pointer-events-auto">
+            <WatchLaterButton
+              itemType="movie"
+              itemId={movie.id}
+              slug={movie.slug}
+              title={movie.title}
+              url={movie.url}
+              imageUrl={movie.coverUrl}
+              releaseDate={movie.date}
+              studio={movie.studio}
+            />
+            {movie.date ? (
+              <span className="rounded-md bg-black/70 backdrop-blur-md px-2 py-0.5 text-[10px] font-mono text-white/70 border border-white/10 shadow-sm">
+                {movie.date}
+              </span>
+            ) : null}
+          </div>
         </div>
 
         {/* External Link */}

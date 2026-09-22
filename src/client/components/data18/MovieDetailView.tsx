@@ -7,6 +7,8 @@ import { performerHref, sceneHref, studioHref } from '../../lib/data18Nav';
 import ImageLightbox from '../gallery/ImageLightbox';
 import CastSection from './CastSection';
 import TagList from './TagList';
+import WatchLaterButton from './WatchLaterButton';
+import WatchSearchMenu from './WatchSearchMenu';
 
 function Badge({ children }: { children: ReactNode }) {
   return (
@@ -97,14 +99,37 @@ export default function MovieDetailView({ movie }: { movie: Data18MovieDetail })
               ) : null}
             </dl>
 
-            <a
-              href={movie.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 w-fit rounded-xl border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-semibold text-white/70 hover:text-white hover:bg-white/10 transition-all"
-            >
-              Open on Data18 ↗
-            </a>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <WatchLaterButton
+                itemType="movie"
+                itemId={movie.id}
+                slug={movie.slug}
+                title={movie.title}
+                url={movie.url}
+                imageUrl={movie.coverUrl}
+                releaseDate={movie.releaseDate || movie.year}
+                duration={movie.duration}
+                studio={movie.studio}
+                cast={movie.cast}
+                variant="pill"
+              />
+
+              <WatchSearchMenu
+                title={movie.title}
+                studioName={movie.studio?.name}
+                castNames={movie.cast?.map((c) => c.name)}
+                variant="detail"
+              />
+
+              <a
+                href={movie.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-xl border border-white/10 bg-white/[0.05] px-3.5 py-2 text-xs font-semibold text-white/70 hover:text-white hover:bg-white/10 transition-all"
+              >
+                Open on Data18 ↗
+              </a>
+            </div>
           </div>
         </div>
       </div>

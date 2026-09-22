@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import type { Data18Scene } from '../../../shared/data18Types';
 import { toProxiedImageUrl } from '../../lib/imageUrl';
 import { performerHref, sceneHref, studioHref } from '../../lib/data18Nav';
+import WatchLaterButton from './WatchLaterButton';
 
 interface SceneCardProps {
   scene: Data18Scene;
@@ -36,7 +37,7 @@ export default function SceneCard({ scene, onZoomImage }: SceneCardProps) {
         {/* Gradient overlay */}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0c121d] via-transparent to-black/30" />
 
-        {/* Top Badges: Photos & Date */}
+        {/* Top Badges: Photos & Date & Watch Later */}
         <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-2 pointer-events-none">
           {scene.photosCount ? (
             <span className="flex items-center gap-1 rounded-md bg-black/60 backdrop-blur-md px-2 py-0.5 text-[11px] font-mono text-cyan-300 font-semibold border border-cyan-400/20 shadow-sm">
@@ -46,11 +47,23 @@ export default function SceneCard({ scene, onZoomImage }: SceneCardProps) {
             <span />
           )}
 
-          {scene.date ? (
-            <span className="rounded-md bg-black/60 backdrop-blur-md px-2 py-0.5 text-[10px] font-mono text-white/70 border border-white/10 shadow-sm">
-              {scene.date}
-            </span>
-          ) : null}
+          <div className="flex items-center gap-1.5 pointer-events-auto">
+            <WatchLaterButton
+              itemType="scene"
+              itemId={scene.id}
+              title={scene.title}
+              url={scene.url}
+              imageUrl={scene.imageUrl}
+              releaseDate={scene.date}
+              studio={scene.studio}
+              cast={scene.cast}
+            />
+            {scene.date ? (
+              <span className="rounded-md bg-black/60 backdrop-blur-md px-2 py-0.5 text-[10px] font-mono text-white/70 border border-white/10 shadow-sm">
+                {scene.date}
+              </span>
+            ) : null}
+          </div>
         </div>
 
         {/* Quick External Link */}

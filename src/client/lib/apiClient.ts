@@ -22,6 +22,10 @@ import type {
   Data18PornPicsResult,
   Data18Favorite,
   Data18FeedResponse,
+  Data18WatchLaterItem,
+  Data18WatchLaterResponse,
+  Data18WatchLaterBackup,
+  Data18WatchLaterBackupItem,
 } from '../../shared/data18Types';
 import type {
   GameSessionCreateInput,
@@ -236,6 +240,54 @@ export const apiClient = {
     }),
 
   getData18Feed: () => request<Data18FeedResponse>('/api/data18/feed'),
+
+  getData18WatchLater: (params?: {
+    filter?: 'all' | 'unwatched' | 'watched';
+    type?: 'all' | 'scene' | 'movie';
+    search?: string;
+  }) => {
+    const q = new URLSearchParams();
+    if (params?.filter && params.filter !== 'all') q.set('filter', params.filter);
+    if (params?.type && params.type !== 'all') q.set('type', params.type);
+    if (params?.search && params.search.trim()) q.set('search', params.search.trim());
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+    return request<Data18WatchLaterResponse>(`/api/data18/watch-later${queryStr}`);
+  },
+
+  addData18WatchLater: (item: Partial<Data18WatchLaterItem> & {
+    itemType: 'scene' | 'movie';
+    itemId: string;
+    title: string;
+    url: string;
+  }) =>
+    request<Data18WatchLaterItem>('/api/data18/watch-later', {
+      method: 'POST',
+      body: JSON.stringify(item),
+    }),
+
+  removeData18WatchLater: (params: { id?: number; itemType?: 'scene' | 'movie'; itemId?: string }) => {
+    const q = new URLSearchParams();
+    if (params.id !== undefined) q.set('id', String(params.id));
+    if (params.itemType) q.set('itemType', params.itemType);
+    if (params.itemId) q.set('itemId', params.itemId);
+    return request<{ ok: boolean }>(`/api/data18/watch-later?${q.toString()}`, {
+      method: 'DELETE',
+    });
+  },
+
+  updateData18WatchLater: (id: number, patch: { isWatched?: boolean; notes?: string | null }) =>
+    request<Data18WatchLaterItem>(`/api/data18/watch-later/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+
+  exportData18WatchLater: () => request<Data18WatchLaterBackup>('/api/data18/watch-later/export'),
+
+  importData18WatchLater: (data: { mode: 'merge' | 'replace'; items: Data18WatchLaterBackupItem[] }) =>
+    request<{ ok: boolean; imported: number; mode: string }>('/api/data18/watch-later/import', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   getGalleryImages: (url: string) =>
     request<GalleryImagesResponse>(`/api/crawler/gallery?url=${encodeURIComponent(url)}`),

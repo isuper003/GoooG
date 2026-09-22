@@ -202,3 +202,59 @@ export interface Data18FeedResponse {
   /** Total number of favorites; the feed only loads the most recent ones. */
   totalFavorites: number;
 }
+
+export interface Data18WatchLaterItem {
+  id: number;
+  itemType: 'scene' | 'movie';
+  itemId: string;
+  title: string;
+  slug?: string;
+  url: string;
+  imageUrl?: string;
+  releaseDate?: string | null;
+  duration?: string | null;
+  studio?: { name: string; slug: string } | null;
+  cast?: { name: string; slug: string }[];
+  isWatched: boolean;
+  notes?: string | null;
+  createdAt: string;
+  watchedAt?: string | null;
+}
+
+export interface Data18WatchLaterStats {
+  total: number;
+  unwatched: number;
+  watched: number;
+  scenes: number;
+  movies: number;
+}
+
+export interface Data18WatchLaterResponse {
+  items: Data18WatchLaterItem[];
+  stats: Data18WatchLaterStats;
+}
+
+export interface Data18WatchLaterBackupItem {
+  itemType: 'scene' | 'movie';
+  itemId: string;
+  title: string;
+  slug?: string;
+  url: string;
+  imageUrl?: string;
+  releaseDate?: string | null;
+  duration?: string | null;
+  studio?: { name: string; slug: string } | null;
+  cast?: { name: string; slug: string }[];
+  isWatched: boolean;
+  notes?: string | null;
+  createdAt?: string;
+  watchedAt?: string | null;
+}
+
+export interface Data18WatchLaterBackup {
+  version: 1;
+  exportedAt: string;
+  totalCount: number;
+  items: Data18WatchLaterBackupItem[];
+}
+

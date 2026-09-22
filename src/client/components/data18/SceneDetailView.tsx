@@ -7,6 +7,7 @@ import ImageLightbox from '../gallery/ImageLightbox';
 import CastSection from './CastSection';
 import TagList from './TagList';
 import WatchSearchMenu from './WatchSearchMenu';
+import WatchLaterButton from './WatchLaterButton';
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
@@ -94,6 +95,19 @@ export default function SceneDetailView({ scene }: { scene: Data18SceneDetail })
             </dl>
 
             <div className="mt-auto flex flex-wrap items-center gap-2 pt-2">
+              <WatchLaterButton
+                itemType="scene"
+                itemId={scene.id}
+                title={scene.title}
+                url={scene.url}
+                imageUrl={scene.imageUrl || scene.thumbUrl}
+                releaseDate={scene.releaseDate}
+                duration={scene.duration}
+                studio={scene.studio}
+                cast={scene.cast}
+                variant="pill"
+              />
+
               <WatchSearchMenu
                 title={scene.title}
                 movieTitle={scene.movie?.title}
@@ -106,7 +120,7 @@ export default function SceneDetailView({ scene }: { scene: Data18SceneDetail })
                 href={scene.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-fit rounded-xl border border-white/10 bg-white/[0.05] px-3.5 py-1.5 text-xs font-semibold text-white/70 hover:text-white hover:bg-white/10 transition-all"
+                className="w-fit rounded-xl border border-white/10 bg-white/[0.05] px-3.5 py-2 text-xs font-semibold text-white/70 hover:text-white hover:bg-white/10 transition-all"
               >
                 Open on Data18 ↗
               </a>
