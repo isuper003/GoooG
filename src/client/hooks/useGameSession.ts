@@ -43,6 +43,13 @@ export interface UseGameSessionInput {
     matchSamples: number;
   } | null;
   drill?: { masteryTarget: number } | null;
+  rewardClipsEnabled?: boolean;
+}
+
+export interface ActiveRewardClip {
+  characterName: string;
+  code: string;
+  pool: string[];
 }
 
 interface ClassicRoundData {
@@ -263,6 +270,48 @@ export function useGameSession(input: UseGameSessionInput) {
       : null
   );
   const [finalSummary, setFinalSummary] = useState<FinalSummary | null>(null);
+  const [activeRewardClip, setActiveRewardClip] = useState<ActiveRewardClip | null>(null);
+  const rewardDismissResolverRef = useRef<(() => void) | null>(null);
+  const prefetchedClipRef = useRef<{ name: string; code: string; pool: string[] } | null>(null);
+
+  // Background pre-fetch reward clip for the current round's target performer
+  useEffect(() => {
+    if (!currentRound || !input.rewardClipsEnabled) {
+      prefetchedClipRef.current = null;
+      return;
+    }
+
+    let targetName = '';
+    if (currentRound.mode === 'classic') {
+      targetName =
+        currentRound.options.find((o) => o.characterId === currentRound.correctCharacterId)?.name ||
+        '';
+    } else {
+      targetName = currentRound.promptName || '';
+    }
+
+    if (!targetName) return;
+
+    let cancelled = false;
+    apiClient
+      .getRandomRewardClip(targetName)
+      .then((res) => {
+        if (!cancelled && res.ok && res.code) {
+          prefetchedClipRef.current = {
+            name: targetName,
+            code: res.code,
+            pool: res.pool || [res.code],
+          };
+        }
+      })
+      .catch(() => {
+        if (!cancelled) prefetchedClipRef.current = null;
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRound, input.rewardClipsEnabled]);
 
   function getNextMainTargetId(): number | null {
     const drillTracker = drillTrackerRef.current;
@@ -410,45 +459,68 @@ export function useGameSession(input: UseGameSessionInput) {
     setStatus('results');
   }
 
-  async function advanceMain() {
+  async function waitFeedbackOrReward(isCorrect: boolean, targetName: string) {
+    const clip = prefetchedClipRef.current;
+    if (
+      isCorrect &&
+      input.rewardClipsEnabled &&
+      clip &&
+      clip.name.toLowerCase() === targetName.toLowerCase()
+    ) {
+      setActiveRewardClip({
+        characterName: clip.name,
+        code: clip.code,
+        pool: clip.pool,
+      });
+      await new Promise<void>((resolve) => {
+        rewardDismissResolverRef.current = resolve;
+      });
+      setActiveRewardClip(null);
+      prefetchedClipRef.current = null;
+    } else {
+      await wait(FEEDBACK_MS);
+    }
+  }
+
+  async function advanceMain(isCorrect: boolean, targetName: string) {
     const drillTracker = drillTrackerRef.current;
     const isComplete = drillTracker
       ? drillTracker.isComplete() || drillTracker.getNextTarget() === null
       : input.plannedRounds !== null && mainRoundIndexRef.current >= input.plannedRounds;
     if (isComplete) {
-      await wait(FEEDBACK_MS);
+      await waitFeedbackOrReward(isCorrect, targetName);
       goToResults();
       return;
     }
     const nextId = getNextMainTargetId();
     if (nextId === null) {
-      await wait(FEEDBACK_MS);
+      await waitFeedbackOrReward(isCorrect, targetName);
       goToResults();
       return;
     }
     const next = buildRoundData(nextId, input.mode, liveCharsRef.current, input.confusion);
-    await Promise.all([wait(FEEDBACK_MS), preloadRound(next)]);
+    await Promise.all([waitFeedbackOrReward(isCorrect, targetName), preloadRound(next)]);
     setCurrentRound(next);
     setSelectedCharacterId(null);
     setRoundNumber(mainRoundIndexRef.current + 1);
     setStatus('playing');
   }
 
-  async function advanceRemediation() {
+  async function advanceRemediation(isCorrect: boolean, targetName: string) {
     const tracker = remediationTrackerRef.current;
     if (!tracker || tracker.isComplete()) {
-      await wait(FEEDBACK_MS);
+      await waitFeedbackOrReward(isCorrect, targetName);
       finalizeSession();
       return;
     }
     const nextId = tracker.getNextTarget();
     if (nextId === null) {
-      await wait(FEEDBACK_MS);
+      await waitFeedbackOrReward(isCorrect, targetName);
       finalizeSession();
       return;
     }
     const next = buildRoundData(nextId, input.mode, liveCharsRef.current, input.confusion);
-    await Promise.all([wait(FEEDBACK_MS), preloadRound(next)]);
+    await Promise.all([waitFeedbackOrReward(isCorrect, targetName), preloadRound(next)]);
     setCurrentRound(next);
     setSelectedCharacterId(null);
     setStatus('remediationPlaying');
@@ -554,14 +626,33 @@ export function useGameSession(input: UseGameSessionInput) {
     setStatus(phase === 'main' ? 'feedback' : 'remediationFeedback');
 
     if (phase === 'main') {
-      void advanceMain();
+      void advanceMain(isCorrect, liveChar.name);
     } else {
-      void advanceRemediation();
+      void advanceRemediation(isCorrect, liveChar.name);
     }
   }
 
+  function dismissRewardClip() {
+    if (rewardDismissResolverRef.current) {
+      rewardDismissResolverRef.current();
+      rewardDismissResolverRef.current = null;
+    }
+    setActiveRewardClip(null);
+  }
+
   function endSessionEarly() {
-    if (status !== 'playing') return;
+    if (
+      status !== 'playing' &&
+      status !== 'feedback' &&
+      status !== 'remediationPlaying' &&
+      status !== 'remediationFeedback'
+    )
+      return;
+    if (rewardDismissResolverRef.current) {
+      rewardDismissResolverRef.current();
+      rewardDismissResolverRef.current = null;
+    }
+    setActiveRewardClip(null);
     goToResults();
   }
 
@@ -613,6 +704,8 @@ export function useGameSession(input: UseGameSessionInput) {
       startRemediation,
       skipRemediation,
       finishRemediationEarly,
+      activeRewardClip,
+      dismissRewardClip,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
@@ -625,6 +718,7 @@ export function useGameSession(input: UseGameSessionInput) {
       remediationProgress,
       drillProgress,
       finalSummary,
+      activeRewardClip,
     ]
   );
 }

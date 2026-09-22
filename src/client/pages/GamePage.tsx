@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { useGameSession, type GameMode } from '../hooks/useGameSession';
@@ -10,6 +10,7 @@ import ResultsScreen from '../components/game/ResultsScreen';
 import RemediationScreen from '../components/game/RemediationScreen';
 import SessionCompleteScreen from '../components/game/SessionCompleteScreen';
 import FullscreenButton from '../components/ui/FullscreenButton';
+import RewardClipModal from '../components/game/RewardClipModal';
 
 interface GameLocationState {
   sessionId: number;
@@ -67,6 +68,23 @@ export default function GamePage() {
 }
 
 function ActiveGame({ state }: { state: GameLocationState }) {
+  const [rewardClipsEnabled, setRewardClipsEnabled] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('gooog_reward_clips_enabled');
+      return stored !== null ? stored === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('gooog_reward_clips_enabled', String(rewardClipsEnabled));
+    } catch {
+      // ignore
+    }
+  }, [rewardClipsEnabled]);
+
   const game = useGameSession({
     sessionId: state.sessionId,
     pool: state.pool,
@@ -76,6 +94,7 @@ function ActiveGame({ state }: { state: GameLocationState }) {
     confusion: state.confusion,
     latencyBaseline: state.latencyBaseline,
     drill: state.drill,
+    rewardClipsEnabled,
   });
   const [confirmingEnd, setConfirmingEnd] = useState(false);
 
@@ -122,7 +141,21 @@ function ActiveGame({ state }: { state: GameLocationState }) {
                 </span>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <button
+                  type="button"
+                  onClick={() => setRewardClipsEnabled((prev) => !prev)}
+                  className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-mono font-semibold transition-all cursor-pointer select-none ${
+                    rewardClipsEnabled
+                      ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300 shadow-sm shadow-emerald-500/10'
+                      : 'border-white/10 bg-white/5 text-white/40 hover:text-white/70'
+                  }`}
+                  title="Toggle 10-second Victory Clip on correct answers"
+                >
+                  <span className="text-xs">🎬</span>
+                  <span>Clips:</span>
+                  <span className="font-bold">{rewardClipsEnabled ? 'ON' : 'OFF'}</span>
+                </button>
                 <FullscreenButton variant="header" />
                 {confirmingEnd ? (
                   <div className="flex items-center gap-2 text-xs font-mono">
@@ -208,6 +241,16 @@ function ActiveGame({ state }: { state: GameLocationState }) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {game.activeRewardClip && (
+        <RewardClipModal
+          characterName={game.activeRewardClip.characterName}
+          initialCode={game.activeRewardClip.code}
+          initialPool={game.activeRewardClip.pool}
+          durationSeconds={10}
+          onClose={game.dismissRewardClip}
+        />
+      )}
     </div>
   );
 }

@@ -245,7 +245,22 @@ export const apiClient = {
 
   scrapeWatchVideos: (query: string) =>
     request<WatchScrapeResponse>(`/api/watch/search?q=${encodeURIComponent(query)}`),
+
+  getRandomRewardClip: (query: string, exclude?: string) => {
+    const params = new URLSearchParams({ q: query });
+    if (exclude) params.set('exclude', exclude);
+    return request<RewardClipResponse>(`/api/reward-clip/random?${params.toString()}`);
+  },
 };
+
+export interface RewardClipResponse {
+  ok: boolean;
+  code?: string;
+  embedUrl?: string;
+  previewUrl?: string;
+  pool?: string[];
+  error?: string;
+}
 
 export interface ScrapedWatchVideo {
   id: string;
