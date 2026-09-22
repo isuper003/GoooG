@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { queryAll, queryOne } from '../db';
+import { queryAll, queryOne, queryAllChunked } from '../db';
 import {
   characterCreateSchema,
   characterUpdateSchema,
@@ -166,18 +166,21 @@ charactersRouter.get('/', async (c) => {
   }
 
   const ids = rows.map((r) => r.id);
-  const placeholders = ids.map(() => '?').join(', ');
 
   const [imageRows, labelRows] = await Promise.all([
-    queryAll<ImageRow>(
+    queryAllChunked<ImageRow>(
       c.env.DB,
-      `SELECT id, character_id, url, position FROM character_images WHERE character_id IN (${placeholders}) ORDER BY position ASC, id ASC`,
-      ...ids
+      (placeholders) =>
+        `SELECT id, character_id, url, position FROM character_images WHERE character_id IN (${placeholders}) ORDER BY position ASC, id ASC`,
+      ids,
+      90
     ),
-    queryAll<LabelRow>(
+    queryAllChunked<LabelRow>(
       c.env.DB,
-      `SELECT l.id, l.name, cl.character_id FROM labels l JOIN character_labels cl ON l.id = cl.label_id WHERE cl.character_id IN (${placeholders}) ORDER BY l.name ASC`,
-      ...ids
+      (placeholders) =>
+        `SELECT l.id, l.name, cl.character_id FROM labels l JOIN character_labels cl ON l.id = cl.label_id WHERE cl.character_id IN (${placeholders}) ORDER BY l.name ASC`,
+      ids,
+      90
     ),
   ]);
 
@@ -240,11 +243,30 @@ charactersRouter.post('/', zValidator('json', characterCreateSchema), async (c) 
     return c.json({ error: 'unknown_category' }, 400);
   }
 
+  const trimmedName = body.name.trim();
+
+  // Guard against duplicate character name within the same category
+  const existingChar = await queryOne<{ id: number }>(
+    c.env.DB,
+    'SELECT id FROM characters WHERE category_id = ? AND name = ? COLLATE NOCASE',
+    category.id,
+    trimmedName
+  );
+  if (existingChar) {
+    return c.json(
+      {
+        error: 'character_already_exists',
+        message: `Character "${trimmedName}" already exists in ${body.categoryKey}.`,
+      },
+      409
+    );
+  }
+
   const resolvedLabelIds = await resolveLabels(c.env.DB, body.labelIds, body.newLabelNames);
 
   const charInsert = await c.env.DB
     .prepare('INSERT INTO characters (name, category_id) VALUES (?, ?) RETURNING id')
-    .bind(body.name.trim(), category.id)
+    .bind(trimmedName, category.id)
     .first<{ id: number }>();
 
   if (!charInsert) {
@@ -310,6 +332,26 @@ charactersRouter.put('/:id', zValidator('json', characterUpdateSchema), async (c
   );
   if (!category) {
     return c.json({ error: 'unknown_category' }, 400);
+  }
+
+  const trimmedName = body.name.trim();
+
+  // Guard against duplicate character name within the same category on rename
+  const existingSameName = await queryOne<{ id: number }>(
+    c.env.DB,
+    'SELECT id FROM characters WHERE category_id = ? AND name = ? COLLATE NOCASE AND id != ?',
+    category.id,
+    trimmedName,
+    id
+  );
+  if (existingSameName) {
+    return c.json(
+      {
+        error: 'character_already_exists',
+        message: `Another character named "${trimmedName}" already exists in ${body.categoryKey}.`,
+      },
+      409
+    );
   }
 
   const resolvedLabelIds = await resolveLabels(c.env.DB, body.labelIds, body.newLabelNames);

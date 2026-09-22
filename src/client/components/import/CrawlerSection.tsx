@@ -19,6 +19,7 @@ export default function CrawlerSection() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [hideExisting, setHideExisting] = useState(false);
   const { data: allCharacters = [] } = useCharacters({});
   const {
     queue,
@@ -60,28 +61,29 @@ export default function CrawlerSection() {
         return;
       }
 
-      // Auto-select the first 6 gallery images; for duplicates: deselect and display program images
+      // Auto-select the first 6 gallery images; for same-category duplicates: deselect and display existing images
       const queueItems: CrawlerQueueItem[] = response.items.map((item, idx) => {
-        const duplicate = allCharacters.find(
+        const sameCategoryDuplicate = allCharacters.find(
           (c) =>
             c.categoryKey === activeCategory &&
             c.name.trim().toLowerCase() === item.name.trim().toLowerCase()
         );
 
-        const isDuplicate = !!duplicate;
-        const availableImages = duplicate
-          ? duplicate.images.map((img) => img.url)
+        const isDuplicate = Boolean(item.isExisting || sameCategoryDuplicate);
+        // Do not hijack images if another character with the same name exists in a different category
+        const availableImages = sameCategoryDuplicate
+          ? sameCategoryDuplicate.images.map((img) => img.url)
           : item.availableImages;
 
         return {
           id: `crawled-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
           name: item.name,
-          avatarUrl: duplicate?.images[0]?.url || item.avatarUrl || '',
+          avatarUrl: sameCategoryDuplicate?.images[0]?.url || item.avatarUrl || '',
           categoryKey: activeCategory,
-          labelIds: duplicate ? duplicate.labels.map((l) => l.id) : [],
+          labelIds: sameCategoryDuplicate ? sameCategoryDuplicate.labels.map((l) => l.id) : [],
           availableImages,
-          galleries: duplicate ? undefined : item.galleries,
-          selectedImages: availableImages.slice(0, 6),
+          galleries: sameCategoryDuplicate ? undefined : item.galleries,
+          selectedImages: isDuplicate ? [] : availableImages.slice(0, 6),
           status: 'pending',
           isSelected: !isDuplicate,
         };
@@ -159,7 +161,17 @@ export default function CrawlerSection() {
             selectedCount={selectedCount}
             allSelected={allSelected}
             someSelected={someSelected}
-            onToggleAll={toggleSelectAll}
+            onToggleAll={(selected) =>
+              toggleSelectAll(
+                selected,
+                (item) =>
+                  !allCharacters.some(
+                    (c) =>
+                      c.categoryKey === activeCategory &&
+                      c.name.trim().toLowerCase() === item.name.trim().toLowerCase()
+                  )
+              )
+            }
           />
         </div>
 
@@ -192,8 +204,29 @@ export default function CrawlerSection() {
       {/* Results List */}
       {queue.length > 0 && (
         <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-display text-xl font-semibold text-fg">Fetched Characters ({queue.length})</h3>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+            <div className="flex items-center gap-3">
+              <h3 className="font-display text-xl font-semibold text-fg">Fetched Characters ({queue.length})</h3>
+              {queue.some((i) =>
+                allCharacters.some(
+                  (c) =>
+                    c.categoryKey === activeCategory &&
+                    c.name.trim().toLowerCase() === i.name.trim().toLowerCase()
+                )
+              ) && (
+                <button
+                  type="button"
+                  onClick={() => setHideExisting((prev) => !prev)}
+                  className={`px-3 py-1 rounded-full text-xs font-mono font-semibold border transition-colors cursor-pointer ${
+                    hideExisting
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      : 'bg-white/5 text-white/60 border-white/10 hover:text-white'
+                  }`}
+                >
+                  {hideExisting ? 'Show Existing' : 'Hide Existing'}
+                </button>
+              )}
+            </div>
             <span className="font-mono text-xs text-fg-dim">
               {selectedReadyCount} selected &amp; ready to save
               {stuckCount > 0 ? ` · ${stuckCount} need images added` : ''}
@@ -201,22 +234,37 @@ export default function CrawlerSection() {
           </div>
 
           <div className="flex flex-col gap-3">
-            {queue.map((item) => {
-              const duplicate = allCharacters.find(
-                (c) =>
-                  c.categoryKey === item.categoryKey &&
-                  c.name.trim().toLowerCase() === item.name.trim().toLowerCase()
-              );
+            {queue
+              .filter((item) => {
+                if (!hideExisting) return true;
+                return !allCharacters.some(
+                  (c) =>
+                    c.categoryKey === activeCategory &&
+                    c.name.trim().toLowerCase() === item.name.trim().toLowerCase()
+                );
+              })
+              .map((item) => {
+                const sameCategoryDuplicate = allCharacters.find(
+                  (c) =>
+                    c.categoryKey === activeCategory &&
+                    c.name.trim().toLowerCase() === item.name.trim().toLowerCase()
+                );
+                const crossCategoryMatch = !sameCategoryDuplicate
+                  ? allCharacters.find(
+                      (c) => c.name.trim().toLowerCase() === item.name.trim().toLowerCase()
+                    )
+                  : undefined;
 
-              return (
-                <CrawledCharacterCard
-                  key={item.id}
-                  item={item}
-                  duplicate={duplicate}
-                  onUpdate={(updates) => updateItem(item.id, updates)}
-                />
-              );
-            })}
+                return (
+                  <CrawledCharacterCard
+                    key={item.id}
+                    item={item}
+                    duplicate={sameCategoryDuplicate || crossCategoryMatch}
+                    isCrossCategory={Boolean(crossCategoryMatch)}
+                    onUpdate={(updates) => updateItem(item.id, updates)}
+                  />
+                );
+              })}
           </div>
 
           {/* Big Save Selected Button at the bottom */}

@@ -24,6 +24,8 @@ export interface ExtractedItem {
   categoryKey: 'trans' | 'sluts' | 'twinks';
   availableImages: string[]; // Gallery images, excluding profile avatar
   galleries?: GalleryCard[]; // Galleries behind the cover images, for browsing their photos
+  isExisting?: boolean;
+  existingId?: number;
 }
 
 interface ProfileLink {
@@ -519,6 +521,8 @@ crawlerRouter.post('/fetch', zValidator('json', crawlerFetchSchema), async (c) =
         avatarUrl: existing.avatarUrl,
         categoryKey,
         availableImages: existing.images,
+        isExisting: true,
+        existingId: existing.id,
       };
     }
     return (
@@ -527,6 +531,7 @@ crawlerRouter.post('/fetch', zValidator('json', crawlerFetchSchema), async (c) =
         avatarUrl: '',
         categoryKey,
         availableImages: [],
+        isExisting: false,
       }
     );
   });
@@ -572,6 +577,8 @@ crawlerRouter.post('/fetch-by-name', zValidator('json', crawlerFetchByNameSchema
         avatarUrl: existing.avatarUrl,
         categoryKey,
         availableImages: existing.images,
+        isExisting: true,
+        existingId: existing.id,
       };
     }
     return (
@@ -580,6 +587,7 @@ crawlerRouter.post('/fetch-by-name', zValidator('json', crawlerFetchByNameSchema
         avatarUrl: '',
         categoryKey,
         availableImages: [],
+        isExisting: false,
       }
     );
   });

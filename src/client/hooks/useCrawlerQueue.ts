@@ -22,8 +22,13 @@ export function useCrawlerQueue() {
     setQueue((prev) => prev.map((item) => (item.id === id ? { ...item, ...updates } : item)));
   }
 
-  function toggleSelectAll(selected: boolean) {
-    setQueue((prev) => prev.map((item) => ({ ...item, isSelected: selected })));
+  function toggleSelectAll(selected: boolean, filterFn?: (item: CrawlerQueueItem) => boolean) {
+    setQueue((prev) =>
+      prev.map((item) => {
+        if (selected && filterFn && !filterFn(item)) return item;
+        return { ...item, isSelected: selected };
+      })
+    );
   }
 
   function clearQueue() {

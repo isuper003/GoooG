@@ -47,6 +47,7 @@ export default function GalleryPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  const { data: allRoster = [] } = useCharacters({});
   const { data: rawCharacters = [], isLoading } = useCharacters({
     category,
     label: labelFilter,
@@ -212,7 +213,7 @@ export default function GalleryPage() {
                 : 'border-transparent text-white/50 hover:text-white'
             }`}
           >
-            All Performers ({rawCharacters.length})
+            All Performers ({allRoster.length || rawCharacters.length})
           </button>
           <button
             type="button"
@@ -226,7 +227,7 @@ export default function GalleryPage() {
                 : 'border-transparent text-white/50 hover:text-white'
             }`}
           >
-            Sluts
+            Sluts ({allRoster.filter((c) => c.categoryKey === 'sluts').length})
           </button>
           <button
             type="button"
@@ -240,7 +241,7 @@ export default function GalleryPage() {
                 : 'border-transparent text-white/50 hover:text-white'
             }`}
           >
-            Trans
+            Trans ({allRoster.filter((c) => c.categoryKey === 'trans').length})
           </button>
           <button
             type="button"
@@ -254,7 +255,7 @@ export default function GalleryPage() {
                 : 'border-transparent text-white/50 hover:text-white'
             }`}
           >
-            Twinks
+            Twinks ({allRoster.filter((c) => c.categoryKey === 'twinks').length})
           </button>
           <button
             type="button"

@@ -22,10 +22,16 @@ export interface CrawlerQueueItem {
 interface CrawledCharacterCardProps {
   item: CrawlerQueueItem;
   duplicate?: CharacterDTO;
+  isCrossCategory?: boolean;
   onUpdate: (updates: Partial<CrawlerQueueItem>) => void;
 }
 
-export default function CrawledCharacterCard({ item, duplicate, onUpdate }: CrawledCharacterCardProps) {
+export default function CrawledCharacterCard({
+  item,
+  duplicate,
+  isCrossCategory = false,
+  onUpdate,
+}: CrawledCharacterCardProps) {
   function toggleSelectedImage(url: string) {
     if (item.selectedImages.includes(url)) {
       onUpdate({ selectedImages: item.selectedImages.filter((u) => u !== url) });
@@ -114,7 +120,15 @@ export default function CrawledCharacterCard({ item, duplicate, onUpdate }: Craw
               </span>
             </div>
             {duplicate ? (
-              <span className="text-[11px] text-amber-400">⚠️ Exists in {duplicate.categoryKey}</span>
+              isCrossCategory ? (
+                <span className="text-[11px] text-cyan-400/90 font-mono">
+                  ℹ️ Different performer with same name exists in {duplicate.categoryKey}
+                </span>
+              ) : (
+                <span className="text-[11px] text-amber-400 font-mono">
+                  ⚠️ Exists in {duplicate.categoryKey}
+                </span>
+              )
             ) : null}
           </div>
         </div>

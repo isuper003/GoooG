@@ -618,6 +618,8 @@ describe('backupRouter', () => {
             isActive: true,
             isLeech: false,
             leechStreak: 0,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
             // Same URL as the existing image at position 0 (should be skipped as a
             // duplicate) plus one genuinely new image, also exported at position 0.
             images: [
@@ -661,6 +663,8 @@ describe('backupRouter', () => {
       isActive: true,
       isLeech: false,
       leechStreak: 0,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
       images,
       labelNames: [],
     });

@@ -144,12 +144,12 @@ export default function HomePage() {
   // Category card counts
   const categoryCounts = useMemo(() => {
     return {
-      sluts: characters.filter((c) => c.categoryKey === 'sluts').length || (previewData?.sluts?.length ?? 0),
-      trans: characters.filter((c) => c.categoryKey === 'trans').length || (previewData?.trans?.length ?? 0),
-      twinks: characters.filter((c) => c.categoryKey === 'twinks').length || (previewData?.twinks?.length ?? 0),
-      mix: characters.length || (previewData?.mix?.length ?? 0),
+      sluts: characters.filter((c) => c.categoryKey === 'sluts').length,
+      trans: characters.filter((c) => c.categoryKey === 'trans').length,
+      twinks: characters.filter((c) => c.categoryKey === 'twinks').length,
+      mix: characters.length,
     };
-  }, [characters, previewData]);
+  }, [characters]);
 
   const activeCard = CARDS.find((c) => c.scope === activeScope) ?? null;
 

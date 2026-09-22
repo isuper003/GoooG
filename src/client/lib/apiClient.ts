@@ -365,6 +365,8 @@ interface CrawledItem {
   galleries?: GalleryCard[];
   categoryKey: 'trans' | 'sluts' | 'twinks';
   availableImages: string[];
+  isExisting?: boolean;
+  existingId?: number;
 }
 
 interface CrawlResponse {
