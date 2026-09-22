@@ -37,10 +37,18 @@ app.notFound((c) => {
   return c.json({ error: 'Not Found' }, 404);
 });
 
-// Write-protection middleware for mutating endpoints under /api
+// Paths that dump the user's full personal data set: these must stay behind the
+// app secret even on GET, since a bare unauthenticated GET could otherwise be
+// used to exfiltrate everything just by knowing the URL.
+const FULL_DATA_EXPORT_PREFIXES = ['/api/backup', '/api/data18/watch-later/export'];
+
+// Write-protection middleware for mutating endpoints (and full-data exports) under /api
 app.use('/api/*', async (c, next) => {
   const method = c.req.method.toUpperCase();
-  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+  const path = c.req.path;
+  const isMutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+  const isFullExport = FULL_DATA_EXPORT_PREFIXES.some((prefix) => path.startsWith(prefix));
+  if (isMutating || isFullExport) {
     const secret = c.req.header('X-App-Secret');
     if (!secret || secret !== c.env.API_WRITE_SECRET) {
       return c.json({ error: 'unauthorized' }, 401);

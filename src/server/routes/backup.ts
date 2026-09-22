@@ -509,14 +509,37 @@ backupRouter.post('/import', zValidator('json', fullBackupImportSchema), async (
     }
 
     if (charId) {
-      // Images
+      // Images. `character_images` has UNIQUE(character_id, position) as well as
+      // UNIQUE(character_id, url), so re-inserting an existing character's images at
+      // their originally-exported positions (which start at 0) would silently collide
+      // with that character's current images and get dropped by INSERT OR IGNORE —
+      // merge mode would then add no new photos to a character that already has any.
+      // Instead, skip images the character already has (by URL) and slot the rest into
+      // the next free position.
       if (char.images && char.images.length > 0) {
+        const existingImages = await queryAll<{ url: string; position: number }>(
+          db,
+          'SELECT url, position FROM character_images WHERE character_id = ?',
+          charId
+        );
+        const existingUrls = new Set(existingImages.map((row) => row.url));
+        const usedPositions = new Set(existingImages.map((row) => row.position));
+        let nextFreePosition =
+          existingImages.length > 0 ? Math.max(...existingImages.map((row) => row.position)) + 1 : 0;
+
         for (const img of char.images) {
+          if (existingUrls.has(img.url)) continue;
+
+          const position = usedPositions.has(img.position) ? nextFreePosition : img.position;
+          usedPositions.add(position);
+          nextFreePosition = Math.max(nextFreePosition, position + 1);
+          existingUrls.add(img.url);
+
           await db
             .prepare(
               'INSERT OR IGNORE INTO character_images (character_id, url, position) VALUES (?, ?, ?)'
             )
-            .bind(charId, img.url, img.position)
+            .bind(charId, img.url, position)
             .run();
         }
       }

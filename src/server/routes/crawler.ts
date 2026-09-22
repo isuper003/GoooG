@@ -51,6 +51,24 @@ const MAX_GALLERY_IMAGES = 30;
 // crawling a listing page.
 const PROFILE_BASE_URL = 'https://www.pornpics.com/pornstars/';
 
+// Hosts the server is allowed to crawl on the caller's behalf. `/fetch` takes an
+// arbitrary URL from the client, so without this allowlist it would act as an
+// open SSRF relay — fetching any http(s) URL a caller supplies and returning
+// the result. Every legitimate use only ever targets pornpics.com (see
+// crawlerConfig.ts on the client), so nothing else needs to be reachable here.
+const ALLOWED_CRAWL_HOSTS = new Set(['www.pornpics.com']);
+
+function isAllowedCrawlUrl(input: string): boolean {
+  try {
+    const url = new URL(input);
+    if (url.protocol !== 'https:') return false;
+    if (url.username || url.password) return false;
+    return ALLOWED_CRAWL_HOSTS.has(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 // Converts a display name into this site's URL slug convention, e.g.
 // "Angela White" -> "angela-white".
 export function slugifyName(name: string): string {
@@ -352,7 +370,7 @@ async function fetchProfile(
   categoryKey: 'trans' | 'sluts' | 'twinks'
 ): Promise<ExtractedItem> {
   try {
-    const profileRes = await fetch(profileUrl, { headers: FETCH_HEADERS });
+    const profileRes = await fetch(profileUrl, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12_000) });
     if (!profileRes.ok) {
       return { name, avatarUrl: '', categoryKey, availableImages: [] };
     }
@@ -448,9 +466,13 @@ export async function getExistingCharactersForCategory(
 crawlerRouter.post('/fetch', zValidator('json', crawlerFetchSchema), async (c) => {
   const { url, categoryKey } = c.req.valid('json');
 
+  if (!isAllowedCrawlUrl(url)) {
+    return c.json({ error: 'Only pornpics.com listing URLs are supported' }, 400);
+  }
+
   let listingHtml: string;
   try {
-    const response = await fetch(url, { headers: FETCH_HEADERS });
+    const response = await fetch(url, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12_000) });
     if (!response.ok) {
       return c.json(
         { error: `Failed to fetch target URL (Status: ${response.status} ${response.statusText})` },
@@ -459,11 +481,16 @@ crawlerRouter.post('/fetch', zValidator('json', crawlerFetchSchema), async (c) =
     }
     listingHtml = await response.text();
   } catch (err: unknown) {
+    const timedOut = err instanceof Error && /timeout|aborted/i.test(`${err.name} ${err.message}`);
     const message = err instanceof Error ? err.message : 'Unknown network error';
-    return c.json({ error: `Could not crawl URL: ${message}` }, 500);
+    return c.json({ error: timedOut ? 'Target URL timed out' : `Could not crawl URL: ${message}` }, timedOut ? 504 : 500);
   }
 
-  const profileLinks = extractProfileLinks(listingHtml, url).slice(0, MAX_PROFILES_PER_CRAWL);
+  // Defense in depth: only follow extracted profile links that stay on the
+  // allowed host, in case the listing page itself contains an off-site link.
+  const profileLinks = extractProfileLinks(listingHtml, url)
+    .filter((link) => isAllowedCrawlUrl(link.profileUrl))
+    .slice(0, MAX_PROFILES_PER_CRAWL);
   const existingMap = await getExistingCharactersForCategory(c.env?.DB, categoryKey);
 
   // Separate links that already exist from new links that need fetching from website

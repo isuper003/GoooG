@@ -364,7 +364,13 @@ function fakeDb() {
         if (sql.includes('FROM categories')) return { results: categories };
         if (sql.includes('FROM labels')) return { results: labels };
         if (sql.includes('FROM characters ORDER BY id ASC')) return { results: characters };
-        if (sql.includes('FROM character_images')) return { results: characterImages };
+        if (sql.includes('FROM character_images')) {
+          if (sql.includes('WHERE character_id = ?')) {
+            const [characterId] = args as [number];
+            return { results: characterImages.filter((ci) => ci.character_id === characterId) };
+          }
+          return { results: characterImages };
+        }
         if (sql.includes('FROM character_labels')) {
           const res = characterLabels.map((cl) => ({
             character_id: cl.character_id,
@@ -562,6 +568,84 @@ describe('backupRouter', () => {
     expect(state.characters[0].name).toBe('Angela White');
     expect(state.data18Favorites).toHaveLength(1);
     expect(state.data18WatchLater).toHaveLength(1);
+  });
+
+  it('merges new images into an existing character instead of dropping them on position collision', async () => {
+    const state = fakeDb();
+    // Existing character already has an image occupying position 0 — the exact
+    // position every image in a fresh export also starts at.
+    state.characters.push({
+      id: 1,
+      name: 'Angela White',
+      category_id: 2, // sluts
+      correct_count: 0,
+      wrong_count: 0,
+      srs_level: 0,
+      is_active: 1,
+      next_review_at: null,
+      last_reviewed_at: null,
+      interval_hours: null,
+      is_leech: 0,
+      leech_streak: 0,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    });
+    state.characterImages.push({ id: 1, character_id: 1, url: 'https://example.com/existing.jpg', position: 0 });
+
+    const app = makeApp(state.db);
+
+    const sampleBackup: FullAppBackup = {
+      version: 1,
+      app: 'GoooG',
+      exportedAt: new Date().toISOString(),
+      summary: {
+        charactersCount: 1,
+        labelsCount: 0,
+        gameSessionsCount: 0,
+        gameAnswersCount: 0,
+        data18FavoritesCount: 0,
+        data18WatchLaterCount: 0,
+      },
+      data: {
+        labels: [],
+        characters: [
+          {
+            name: 'Angela White',
+            categoryKey: 'sluts',
+            correctCount: 0,
+            wrongCount: 0,
+            srsLevel: 0,
+            isActive: true,
+            isLeech: false,
+            leechStreak: 0,
+            // Same URL as the existing image at position 0 (should be skipped as a
+            // duplicate) plus one genuinely new image, also exported at position 0.
+            images: [
+              { url: 'https://example.com/existing.jpg', position: 0 },
+              { url: 'https://example.com/new.jpg', position: 0 },
+            ],
+            labelNames: [],
+          },
+        ],
+        gameSessions: [],
+        data18Favorites: [],
+        data18WatchLater: [],
+      },
+    };
+
+    const res = await app.request('/api/backup/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'merge', backup: sampleBackup }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(state.characterImages).toHaveLength(2);
+    const urls = state.characterImages.map((ci) => ci.url).sort();
+    expect(urls).toEqual(['https://example.com/existing.jpg', 'https://example.com/new.jpg']);
+    // The new image must not have collided with the occupied position 0.
+    const newImage = state.characterImages.find((ci) => ci.url === 'https://example.com/new.jpg');
+    expect(newImage?.position).not.toBe(0);
   });
 
   it('rejects invalid or corrupted backup payloads', async () => {

@@ -48,7 +48,12 @@ proxyRouter.get('/', async (c) => {
       return c.text(`Upstream image error (${upstreamRes.status})`, upstreamRes.status as 400);
     }
 
-    const contentType = upstreamRes.headers.get('content-type') || 'image/jpeg';
+    const contentType = upstreamRes.headers.get('content-type') || '';
+    // This endpoint only ever serves images — without this check it would act as an
+    // open relay for arbitrary content (HTML/JS) served under this app's own origin.
+    if (!contentType.toLowerCase().startsWith('image/')) {
+      return c.text('Upstream response was not an image', 400);
+    }
 
     return new Response(upstreamRes.body, {
       status: 200,
