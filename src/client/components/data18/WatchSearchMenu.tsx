@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { WATCH_SITES, cleanSearchTitle } from '../../config/watchSites';
 import { apiClient, type ScrapedWatchVideo, type SiteScrapeStatus } from '../../lib/apiClient';
@@ -10,6 +10,15 @@ interface WatchSearchMenuProps {
   castNames?: string[];
   studioName?: string;
   variant?: 'card' | 'detail';
+}
+
+export interface SearchToken {
+  id: string;
+  type: 'scene_title' | 'movie_title' | 'studio' | 'cast';
+  label: string;
+  value: string;
+  icon: string;
+  badgeColor: string;
 }
 
 function WatchVideoCard({ video }: { video: ScrapedWatchVideo }) {
@@ -92,6 +101,112 @@ function SkeletonCard() {
   );
 }
 
+function DraggableTokenChip({
+  token,
+  index,
+  total,
+  isDragging,
+  isDragOver,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  onMoveLeft,
+  onMoveRight,
+  onRemove,
+}: {
+  token: SearchToken;
+  index: number;
+  total: number;
+  isDragging: boolean;
+  isDragOver: boolean;
+  onDragStart: (e: React.DragEvent) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
+  onDragEnd: () => void;
+  onMoveLeft: () => void;
+  onMoveRight: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+      className={`group/chip relative flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-semibold shadow-sm transition-all duration-150 select-none ${
+        token.badgeColor
+      } ${
+        isDragging
+          ? 'opacity-40 scale-95 ring-2 ring-cyan-400'
+          : isDragOver
+          ? 'ring-2 ring-cyan-300 border-cyan-400 scale-105'
+          : 'hover:brightness-110'
+      }`}
+    >
+      {/* Drag handle */}
+      <span
+        title="Drag to reorder"
+        className="cursor-grab active:cursor-grabbing text-white/50 hover:text-white transition-colors"
+      >
+        ⠿
+      </span>
+
+      {/* Type Icon */}
+      <span className="text-xs">{token.icon}</span>
+
+      {/* Label */}
+      <span className="max-w-[180px] sm:max-w-[240px] truncate" title={token.value}>
+        {token.label}
+      </span>
+
+      {/* Nudge Buttons (for mobile or click-based reorder) */}
+      <div className="flex items-center gap-0.5 ml-1 border-l border-white/15 pl-1">
+        {index > 0 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onMoveLeft();
+            }}
+            title="Move left"
+            className="rounded px-0.5 text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            ‹
+          </button>
+        )}
+        {index < total - 1 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onMoveRight();
+            }}
+            title="Move right"
+            className="rounded px-0.5 text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            ›
+          </button>
+        )}
+      </div>
+
+      {/* Remove Button */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
+        title="Remove from search"
+        className="ml-0.5 rounded-full p-0.5 text-white/50 hover:text-rose-300 hover:bg-rose-500/20 transition-colors"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
 export default function WatchSearchMenu({
   title,
   movieTitle,
@@ -100,7 +215,6 @@ export default function WatchSearchMenu({
   variant = 'detail',
 }: WatchSearchMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeSource, setActiveSource] = useState<'scene' | 'movie'>('scene');
   const [activeTab, setActiveTab] = useState<'scraped' | 'direct'>('scraped');
   const [selectedSiteFilter, setSelectedSiteFilter] = useState<string>('all');
   const [copied, setCopied] = useState(false);
@@ -109,10 +223,81 @@ export default function WatchSearchMenu({
   const cleanedSceneTitle = cleanSearchTitle(title);
   const cleanedMovieTitle = movieTitle ? cleanSearchTitle(movieTitle) : '';
 
-  const initialQuery =
-    activeSource === 'movie' && cleanedMovieTitle ? cleanedMovieTitle : cleanedSceneTitle;
+  // 1. Build all available tokens from scene data
+  const availableTokens: SearchToken[] = useMemo(() => {
+    const list: SearchToken[] = [];
 
-  const [customQuery, setCustomQuery] = useState(initialQuery);
+    if (cleanedSceneTitle) {
+      list.push({
+        id: 'scene_title',
+        type: 'scene_title',
+        label: cleanedSceneTitle,
+        value: cleanedSceneTitle,
+        icon: '🎞️',
+        badgeColor: 'border-cyan-500/40 bg-cyan-500/15 text-cyan-300',
+      });
+    }
+
+    if (cleanedMovieTitle && cleanedMovieTitle.toLowerCase() !== cleanedSceneTitle.toLowerCase()) {
+      list.push({
+        id: 'movie_title',
+        type: 'movie_title',
+        label: cleanedMovieTitle,
+        value: cleanedMovieTitle,
+        icon: '📼',
+        badgeColor: 'border-indigo-500/40 bg-indigo-500/15 text-indigo-300',
+      });
+    }
+
+    if (studioName && studioName.trim()) {
+      list.push({
+        id: 'studio',
+        type: 'studio',
+        label: studioName.trim(),
+        value: studioName.trim(),
+        icon: '🏢',
+        badgeColor: 'border-amber-500/40 bg-amber-500/15 text-amber-300',
+      });
+    }
+
+    if (castNames && castNames.length > 0) {
+      castNames.forEach((name, idx) => {
+        if (name && name.trim()) {
+          list.push({
+            id: `cast_${idx}`,
+            type: 'cast',
+            label: name.trim(),
+            value: name.trim(),
+            icon: '👤',
+            badgeColor: 'border-purple-500/40 bg-purple-500/15 text-purple-300',
+          });
+        }
+      });
+    }
+
+    return list;
+  }, [cleanedSceneTitle, cleanedMovieTitle, studioName, castNames]);
+
+  // 2. State for active ordered tokens
+  const [activeTokens, setActiveTokens] = useState<SearchToken[]>(() => {
+    return availableTokens.length > 0 ? [availableTokens[0]] : [];
+  });
+
+  // Extra user-typed keywords
+  const [extraKeywords, setExtraKeywords] = useState('');
+
+  // Drag & Drop tracking state
+  const [draggedTokenIndex, setDraggedTokenIndex] = useState<number | null>(null);
+  const [dragOverTokenIndex, setDragOverTokenIndex] = useState<number | null>(null);
+
+  // Compute effective search query string from ordered tokens + extra keywords
+  const effectiveQuery = useMemo(() => {
+    const tokenParts = activeTokens.map((t) => t.value.trim()).filter(Boolean);
+    if (extraKeywords.trim()) {
+      tokenParts.push(extraKeywords.trim());
+    }
+    return tokenParts.join(' ').trim();
+  }, [activeTokens, extraKeywords]);
 
   // Scraper state
   const [isLoadingScrape, setIsLoadingScrape] = useState(false);
@@ -154,19 +339,10 @@ export default function WatchSearchMenu({
   // When modal opens, auto-scrape if not done yet
   useEffect(() => {
     if (isOpen && !hasScraped) {
-      fetchScrapeResults(customQuery);
+      const queryToRun = effectiveQuery || cleanedSceneTitle || title.trim();
+      fetchScrapeResults(queryToRun);
     }
-  }, [isOpen, hasScraped, customQuery, fetchScrapeResults]);
-
-  // Sync query when activeSource changes
-  useEffect(() => {
-    const nextQuery =
-      activeSource === 'movie' && cleanedMovieTitle ? cleanedMovieTitle : cleanedSceneTitle;
-    setCustomQuery(nextQuery);
-    if (isOpen) {
-      fetchScrapeResults(nextQuery);
-    }
-  }, [activeSource, cleanedMovieTitle, cleanedSceneTitle, isOpen, fetchScrapeResults]);
+  }, [isOpen, hasScraped, effectiveQuery, cleanedSceneTitle, title, fetchScrapeResults]);
 
   // Lock body scroll and handle Escape key when modal is open
   useEffect(() => {
@@ -188,20 +364,48 @@ export default function WatchSearchMenu({
     };
   }, [isOpen]);
 
+  // Toggle token: add if absent, remove if present
+  function toggleToken(token: SearchToken) {
+    setActiveTokens((prev) => {
+      const exists = prev.some((t) => t.id === token.id);
+      if (exists) {
+        return prev.filter((t) => t.id !== token.id);
+      } else {
+        return [...prev, token];
+      }
+    });
+  }
+
+  // Move token to new position
+  function moveToken(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex) return;
+    setActiveTokens((prev) => {
+      if (fromIndex < 0 || fromIndex >= prev.length || toIndex < 0 || toIndex >= prev.length) {
+        return prev;
+      }
+      const updated = [...prev];
+      const [moved] = updated.splice(fromIndex, 1);
+      updated.splice(toIndex, 0, moved);
+      return updated;
+    });
+  }
+
   function handleCopy() {
-    if (!customQuery) return;
-    navigator.clipboard.writeText(customQuery);
+    const q = effectiveQuery || title.trim();
+    if (!q) return;
+    navigator.clipboard.writeText(q);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
   function handleManualSearchSubmit(e: React.FormEvent) {
     e.preventDefault();
-    fetchScrapeResults(customQuery);
+    const q = effectiveQuery || title.trim();
+    fetchScrapeResults(q);
   }
 
   function handleOpenSite(buildUrl: (q: string) => string) {
-    const queryToSearch = customQuery.trim() || title.trim();
+    const queryToSearch = effectiveQuery || title.trim();
     const targetUrl = buildUrl(queryToSearch);
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
   }
@@ -276,106 +480,157 @@ export default function WatchSearchMenu({
                 </button>
               </div>
 
-              {/* Source Selector (Scene vs Full Movie) */}
-              {cleanedMovieTitle && cleanedMovieTitle.toLowerCase() !== cleanedSceneTitle.toLowerCase() ? (
-                <div className="flex flex-col gap-1">
-                  <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-black/40 p-1 border border-white/10 text-xs font-semibold">
-                    <button
-                      type="button"
-                      onClick={() => setActiveSource('scene')}
-                      className={`rounded-lg py-1 px-2 text-center truncate transition-all ${
-                        activeSource === 'scene'
-                          ? 'bg-cyan-500/20 text-cyan-300 shadow-sm border border-cyan-500/30'
-                          : 'text-white/60 hover:text-white border border-transparent'
-                      }`}
-                      title={cleanedSceneTitle}
-                    >
-                      🎞️ Scene: {cleanedSceneTitle}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveSource('movie')}
-                      className={`rounded-lg py-1 px-2 text-center truncate transition-all ${
-                        activeSource === 'movie'
-                          ? 'bg-cyan-500/20 text-cyan-300 shadow-sm border border-cyan-500/30'
-                          : 'text-white/60 hover:text-white border border-transparent'
-                      }`}
-                      title={cleanedMovieTitle}
-                    >
-                      📼 Movie: {cleanedMovieTitle}
-                    </button>
+              {/* Token-Based Search Query Builder */}
+              <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-black/40 p-3">
+                {/* Section 1: Active Reorderable Chips in Search Bar */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-white/50">
+                    <span>Active Search Query (Drag ⠿ to Reorder):</span>
+                    {activeTokens.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTokens([])}
+                        className="hover:text-rose-300 transition-colors"
+                      >
+                        Clear All
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="min-h-[42px] flex flex-wrap items-center gap-1.5 rounded-xl border border-white/10 bg-black/60 p-2">
+                    {activeTokens.length === 0 ? (
+                      <span className="text-xs text-white/30 italic">
+                        No labels active. Click any label below to add it to your search query.
+                      </span>
+                    ) : (
+                      activeTokens.map((token, index) => (
+                        <DraggableTokenChip
+                          key={token.id}
+                          token={token}
+                          index={index}
+                          total={activeTokens.length}
+                          isDragging={draggedTokenIndex === index}
+                          isDragOver={dragOverTokenIndex === index}
+                          onDragStart={(e) => {
+                            setDraggedTokenIndex(index);
+                            e.dataTransfer.effectAllowed = 'move';
+                            e.dataTransfer.setData('text/plain', String(index));
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                            if (dragOverTokenIndex !== index) {
+                              setDragOverTokenIndex(index);
+                            }
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            if (draggedTokenIndex !== null && draggedTokenIndex !== index) {
+                              moveToken(draggedTokenIndex, index);
+                            }
+                            setDraggedTokenIndex(null);
+                            setDragOverTokenIndex(null);
+                          }}
+                          onDragEnd={() => {
+                            setDraggedTokenIndex(null);
+                            setDragOverTokenIndex(null);
+                          }}
+                          onMoveLeft={() => moveToken(index, index - 1)}
+                          onMoveRight={() => moveToken(index, index + 1)}
+                          onRemove={() => toggleToken(token)}
+                        />
+                      ))
+                    )}
                   </div>
                 </div>
-              ) : null}
 
-              {/* Search Query Input Form */}
-              <form onSubmit={handleManualSearchSubmit} className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/50 px-3 py-1.5 focus-within:border-cyan-400/50">
-                  <span className="text-white/40 text-xs">🔍</span>
-                  <input
-                    type="text"
-                    value={customQuery}
-                    onChange={(e) => setCustomQuery(e.target.value)}
-                    placeholder="Enter keywords..."
-                    className="w-full bg-transparent text-sm text-white placeholder:text-white/30 focus:outline-none font-medium"
-                  />
+                {/* Section 2: Extra Keywords Input + Action Buttons */}
+                <form onSubmit={handleManualSearchSubmit} className="flex items-center gap-2 pt-0.5">
+                  <div className="flex flex-1 items-center gap-2 rounded-xl border border-white/10 bg-black/50 px-3 py-1.5 focus-within:border-cyan-400/50">
+                    <span className="text-white/40 text-xs">🔍</span>
+                    <input
+                      type="text"
+                      value={extraKeywords}
+                      onChange={(e) => setExtraKeywords(e.target.value)}
+                      placeholder="Type extra keywords (e.g. 1080p, uncut)..."
+                      className="w-full bg-transparent text-sm text-white placeholder:text-white/30 focus:outline-none font-medium"
+                    />
+                  </div>
+
                   <button
                     type="button"
                     onClick={handleCopy}
-                    title="Copy search query"
-                    className="shrink-0 rounded-lg bg-white/10 hover:bg-white/20 px-2 py-1 text-xs font-mono font-semibold text-white/80 transition-all"
+                    title="Copy full search query"
+                    className="shrink-0 rounded-xl bg-white/10 hover:bg-white/20 px-3 py-2 text-xs font-mono font-semibold text-white/80 transition-all"
                   >
                     {copied ? '✓ Copied' : 'Copy'}
                   </button>
+
                   <button
                     type="submit"
-                    disabled={isLoadingScrape || !customQuery.trim()}
-                    className="shrink-0 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black px-3 py-1 text-xs font-bold transition-all active:scale-95 flex items-center gap-1"
+                    disabled={isLoadingScrape || (!effectiveQuery && !title.trim())}
+                    className="shrink-0 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black px-4 py-2 text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shadow-md shadow-cyan-500/20"
                   >
                     {isLoadingScrape ? (
-                      <span className="inline-block animate-spin text-[10px]">⏳</span>
+                      <>
+                        <span className="inline-block animate-spin text-xs">⏳</span>
+                        <span>Searching...</span>
+                      </>
                     ) : (
-                      <span>Search</span>
+                      <>
+                        <span>Search</span>
+                        <span className="text-[10px]">↗</span>
+                      </>
                     )}
                   </button>
+                </form>
+
+                {/* Section 3: Available Labels (Click to Add / Remove) */}
+                <div className="flex flex-col gap-1 pt-1 border-t border-white/5">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-white/40">
+                    Available Labels (Click to Toggle On / Off):
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5 max-h-24 overflow-y-auto pr-1">
+                    {availableTokens.map((token) => {
+                      const isSelected = activeTokens.some((t) => t.id === token.id);
+                      return (
+                        <button
+                          key={token.id}
+                          type="button"
+                          onClick={() => toggleToken(token)}
+                          className={`group flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-semibold transition-all active:scale-95 ${
+                            isSelected
+                              ? `${token.badgeColor} shadow-sm ring-1 ring-white/20`
+                              : 'border-white/10 bg-white/[0.03] text-white/50 hover:text-white hover:bg-white/[0.07] hover:border-white/20'
+                          }`}
+                        >
+                          <span className="text-xs">{token.icon}</span>
+                          <span className="max-w-[160px] truncate" title={token.value}>
+                            {token.label}
+                          </span>
+                          <span
+                            className={`text-[10px] font-bold ${
+                              isSelected ? 'text-cyan-300' : 'text-white/30 group-hover:text-white/70'
+                            }`}
+                          >
+                            {isSelected ? '✓' : '+'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Quick Append Chips: Studio & Cast */}
-                {studioName || (castNames && castNames.length > 0) ? (
-                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                    <span className="text-[10px] font-mono text-white/40 uppercase">Append:</span>
-                    {studioName && !customQuery.toLowerCase().includes(studioName.toLowerCase()) ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const nq = `${customQuery.trim()} ${studioName}`.trim();
-                          setCustomQuery(nq);
-                          fetchScrapeResults(nq);
-                        }}
-                        className="rounded-lg bg-white/5 hover:bg-cyan-500/20 hover:text-cyan-300 border border-white/10 px-2 py-0.5 text-xs text-white/70 transition-colors"
-                      >
-                        + {studioName}
-                      </button>
-                    ) : null}
-                    {castNames?.slice(0, 3).map((name) =>
-                      !customQuery.toLowerCase().includes(name.toLowerCase()) ? (
-                        <button
-                          key={name}
-                          type="button"
-                          onClick={() => {
-                            const nq = `${customQuery.trim()} ${name}`.trim();
-                            setCustomQuery(nq);
-                            fetchScrapeResults(nq);
-                          }}
-                          className="rounded-lg bg-white/5 hover:bg-cyan-500/20 hover:text-cyan-300 border border-white/10 px-2 py-0.5 text-xs text-white/70 transition-colors"
-                        >
-                          + {name}
-                        </button>
-                      ) : null
-                    )}
+                {/* Section 4: Resulting Search String Preview */}
+                {effectiveQuery ? (
+                  <div className="flex items-center gap-1.5 text-[11px] font-mono text-white/40 pt-0.5 truncate">
+                    <span className="shrink-0 text-white/30">Query Preview:</span>
+                    <span className="text-cyan-300/80 truncate font-semibold">
+                      &quot;{effectiveQuery}&quot;
+                    </span>
                   </div>
                 ) : null}
-              </form>
+              </div>
 
               {/* Tab Navigation */}
               <div className="flex items-center gap-2 border-b border-white/10 pb-2">
@@ -414,7 +669,7 @@ export default function WatchSearchMenu({
               {/* Tab Content 1: Scraped Video Cards */}
               {activeTab === 'scraped' && (
                 <div className="flex flex-1 flex-col overflow-hidden min-h-[260px]">
-                  {/* Site Filter Pills (shown if multiple sites returned results) */}
+                  {/* Site Filter Pills */}
                   {!isLoadingScrape && sitesWithResults.length > 1 && (
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-2 text-[11px] font-mono scrollbar-none">
                       <button
@@ -468,7 +723,7 @@ export default function WatchSearchMenu({
                         <p className="text-sm font-semibold text-rose-300">{scrapeError}</p>
                         <button
                           type="button"
-                          onClick={() => fetchScrapeResults(customQuery)}
+                          onClick={() => fetchScrapeResults(effectiveQuery || title.trim())}
                           className="mt-2 rounded-xl bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs font-semibold text-white transition-colors"
                         >
                           Retry Search
@@ -486,7 +741,7 @@ export default function WatchSearchMenu({
                         <div className="flex flex-col gap-1 max-w-sm">
                           <p className="text-sm font-bold text-white">No direct video results found</p>
                           <p className="text-xs text-white/50">
-                            Try shorter keywords or click the &quot;Direct Site Links&quot; tab to search directly on each platform.
+                            Try rearranging the labels, toggling off specific words, or click &quot;Direct Site Links&quot; to search on the sites directly.
                           </p>
                         </div>
                         <button
@@ -506,7 +761,7 @@ export default function WatchSearchMenu({
                       <span>Found {videos.length} videos across {sitesWithResults.length} sites</span>
                       <button
                         type="button"
-                        onClick={() => fetchScrapeResults(customQuery)}
+                        onClick={() => fetchScrapeResults(effectiveQuery || title.trim())}
                         className="hover:text-cyan-300 transition-colors"
                       >
                         ↻ Refresh results
@@ -521,7 +776,7 @@ export default function WatchSearchMenu({
                 <div className="flex flex-1 flex-col gap-2 overflow-y-auto max-h-[50vh] pr-1">
                   <p className="text-xs text-white/60 mb-1">
                     Click any site to execute an external search in a new tab using the query:{' '}
-                    <span className="font-mono text-cyan-300">&quot;{customQuery.trim()}&quot;</span>
+                    <span className="font-mono text-cyan-300">&quot;{effectiveQuery || title.trim()}&quot;</span>
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {WATCH_SITES.map((site) => {
