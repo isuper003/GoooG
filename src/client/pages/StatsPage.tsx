@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { CharacterSort } from '../lib/apiClient';
 import { useStatsOverview, useConfusions } from '../hooks/useStats';
 import { useCharacters } from '../hooks/useCharacters';
@@ -20,16 +21,26 @@ export default function StatsPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full pb-10">
-      <div className="border-b border-white/[0.08] pb-5">
-        <span className="text-[11px] font-mono text-cyan-400 uppercase tracking-widest font-semibold">
-          Analytics &amp; Performance
-        </span>
-        <h1 className="text-3xl sm:text-4xl font-display font-black text-white tracking-tight mt-0.5">
-          Recognition &amp; Retention Stats
-        </h1>
-        <p className="text-white/50 mt-1 text-xs">
-          Cross-category accuracy telemetry, SRS spaced-repetition distribution, and performer retention ranks.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/[0.08] pb-5">
+        <div>
+          <span className="text-[11px] font-mono text-cyan-400 uppercase tracking-widest font-semibold">
+            Analytics &amp; Performance
+          </span>
+          <h1 className="text-3xl sm:text-4xl font-display font-black text-white tracking-tight mt-0.5">
+            Recognition &amp; Retention Stats
+          </h1>
+          <p className="text-white/50 mt-1 text-xs">
+            Cross-category accuracy telemetry, SRS spaced-repetition distribution, and performer retention ranks.
+          </p>
+        </div>
+
+        <Link
+          to="/import?mode=backup"
+          className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/10 px-3.5 py-2 text-xs font-semibold text-white/90 transition-all shadow-sm"
+        >
+          <span>📦</span>
+          <span>Full Backup &amp; Restore</span>
+        </Link>
       </div>
 
       {isLoading || !overview ? (

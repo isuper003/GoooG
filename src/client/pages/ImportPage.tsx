@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ApiError } from '../lib/apiClient';
 import { useCharacters, useCreateCharacter } from '../hooks/useCharacters';
 import LabelMultiSelect from '../components/shared/LabelMultiSelect';
 import ImageUrlListEditor from '../components/shared/ImageUrlListEditor';
 import CrawlerSection from '../components/import/CrawlerSection';
 import CrawlByNameSection from '../components/import/CrawlByNameSection';
+import BackupRestoreSection from '../components/import/BackupRestoreSection';
 
 const CATEGORY_OPTIONS: { value: 'trans' | 'sluts' | 'twinks'; label: string }[] = [
   { value: 'trans', label: 'Trans' },
@@ -13,7 +15,16 @@ const CATEGORY_OPTIONS: { value: 'trans' | 'sluts' | 'twinks'; label: string }[]
 ];
 
 export default function ImportPage() {
-  const [importMode, setImportMode] = useState<'crawler' | 'byName' | 'manual'>('crawler');
+  const [params, setParams] = useSearchParams();
+  const initialMode = (params.get('mode') as 'crawler' | 'byName' | 'manual' | 'backup') || 'crawler';
+  const [importMode, setImportMode] = useState<'crawler' | 'byName' | 'manual' | 'backup'>(
+    ['crawler', 'byName', 'manual', 'backup'].includes(initialMode) ? initialMode : 'crawler'
+  );
+
+  function handleModeChange(mode: 'crawler' | 'byName' | 'manual' | 'backup') {
+    setImportMode(mode);
+    setParams(mode === 'crawler' ? {} : { mode });
+  }
 
   // Single manual form state
   const [name, setName] = useState('');
@@ -90,10 +101,10 @@ export default function ImportPage() {
         </div>
 
         {/* Mode Buttons */}
-        <div className="flex items-center rounded-xl bg-white/[0.04] border border-white/10 p-1">
+        <div className="flex items-center rounded-xl bg-white/[0.04] border border-white/10 p-1 flex-wrap gap-1">
           <button
             type="button"
-            onClick={() => setImportMode('crawler')}
+            onClick={() => handleModeChange('crawler')}
             className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
               importMode === 'crawler'
                 ? 'bg-white text-black shadow-sm'
@@ -104,7 +115,7 @@ export default function ImportPage() {
           </button>
           <button
             type="button"
-            onClick={() => setImportMode('byName')}
+            onClick={() => handleModeChange('byName')}
             className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
               importMode === 'byName'
                 ? 'bg-white text-black shadow-sm'
@@ -115,7 +126,7 @@ export default function ImportPage() {
           </button>
           <button
             type="button"
-            onClick={() => setImportMode('manual')}
+            onClick={() => handleModeChange('manual')}
             className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
               importMode === 'manual'
                 ? 'bg-white text-black shadow-sm'
@@ -123,6 +134,17 @@ export default function ImportPage() {
             }`}
           >
             ✍ Manual Add
+          </button>
+          <button
+            type="button"
+            onClick={() => handleModeChange('backup')}
+            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+              importMode === 'backup'
+                ? 'bg-cyan-400 text-black shadow-sm font-bold'
+                : 'text-cyan-400/70 hover:text-cyan-300'
+            }`}
+          >
+            📦 Full Backup &amp; Restore
           </button>
         </div>
       </div>
@@ -132,6 +154,9 @@ export default function ImportPage() {
 
       {/* MODE 2: Crawl by Name */}
       {importMode === 'byName' ? <CrawlByNameSection /> : null}
+
+      {/* MODE 3: Backup and Restore */}
+      {importMode === 'backup' ? <BackupRestoreSection /> : null}
 
       {/* MODE 3: Single Manual Form */}
       {importMode === 'manual' ? (

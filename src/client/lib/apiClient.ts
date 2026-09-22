@@ -28,6 +28,11 @@ import type {
   Data18WatchLaterBackupItem,
 } from '../../shared/data18Types';
 import type {
+  BackupSummary,
+  FullAppBackup,
+  FullBackupImportResponse,
+} from '../../shared/backupTypes';
+import type {
   GameSessionCreateInput,
   GameAnswerInput,
   GameSessionFinishInput,
@@ -303,6 +308,16 @@ export const apiClient = {
     if (exclude) params.set('exclude', exclude);
     return request<RewardClipResponse>(`/api/reward-clip/random?${params.toString()}`);
   },
+
+  getFullBackupSummary: () => request<BackupSummary>('/api/backup/summary'),
+
+  exportFullBackup: () => request<FullAppBackup>('/api/backup/export'),
+
+  importFullBackup: (data: { mode: 'merge' | 'replace'; backup: FullAppBackup }) =>
+    request<FullBackupImportResponse>('/api/backup/import', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
 
 export interface RewardClipResponse {
