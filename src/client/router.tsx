@@ -7,11 +7,16 @@ import StatsPage from './pages/StatsPage';
 import ImportPage from './pages/ImportPage';
 import Data18Page from './pages/Data18Page';
 import { Data18MoviePage, Data18ScenePage } from './pages/Data18DetailPage';
+import PlayerPage from './pages/PlayerPage';
 
 export function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Dedicated standalone fullscreen player (0 site chrome, completely separate window) */}
+        <Route path="/player" element={<PlayerPage />} />
+
+        {/* Main application shell */}
         <Route path="/" element={<App />}>
           <Route index element={<HomePage />} />
           <Route path="play" element={<GamePage />} />

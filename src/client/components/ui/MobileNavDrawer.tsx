@@ -22,6 +22,7 @@ const NAV_ICONS: Record<string, string> = {
   '/': '✨',
   '/play': '⚔️',
   '/gallery': '🖼️',
+  '/player': '🎬',
   '/import': '📷',
   '/stats': '📊',
   '/data18': '🎬',
@@ -144,6 +145,8 @@ export default function MobileNavDrawer({
                     <NavLink
                       key={item.to}
                       to={item.to}
+                      target={item.to === '/player' ? '_blank' : undefined}
+                      rel={item.to === '/player' ? 'noopener noreferrer' : undefined}
                       end={item.to === '/'}
                       onClick={onClose}
                       className={({ isActive }) =>

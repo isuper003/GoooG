@@ -12,6 +12,7 @@ const navItems = [
   { to: '/', label: 'Spotlight' },
   { to: '/play', label: 'Arena' },
   { to: '/gallery', label: 'Gallery' },
+  { to: '/player', label: 'Player 🎬' },
   { to: '/import', label: 'Photo Studio' },
   { to: '/stats', label: 'Stats' },
   { to: '/data18', label: 'Data18 🎬' },
@@ -65,6 +66,8 @@ export default function App() {
               <NavLink
                 key={item.to}
                 to={item.to}
+                target={item.to === '/player' ? '_blank' : undefined}
+                rel={item.to === '/player' ? 'noopener noreferrer' : undefined}
                 end={item.to === '/'}
                 className={({ isActive }) =>
                   `shrink-0 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors duration-150 ${
@@ -88,20 +91,35 @@ export default function App() {
 
           {/* Active Performer Quick Action */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <div className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-[11px] font-mono text-white/70">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-              <span>ROSTER: {activeCount || characters.length || 0} ACTIVE</span>
-            </div>
-
+            {/* Random Showcase Icon Button */}
             <button
               type="button"
               onClick={() => setIsRandomOpen(true)}
-              className="hidden sm:flex px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] text-white/80 hover:text-white border border-white/[0.1] hover:border-cyan-400/40 text-xs font-semibold transition-all items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+              className="hidden sm:flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] text-white/80 hover:text-white border border-white/[0.1] hover:border-cyan-400/40 text-sm transition-all cursor-pointer shadow-sm active:scale-95"
               title="Inspect Random Characters"
+              aria-label="Inspect Random Characters"
             >
               <span>🎲</span>
-              <span>Random</span>
             </button>
+
+            {/* PWA Install Header Icon Button */}
+            {!isInstalled && (isInstallable || isIOS) && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (isInstallable && !isIOS) {
+                    promptInstall();
+                  } else {
+                    setIsGuideOpen(true);
+                  }
+                }}
+                className="hidden sm:flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-cyan-400/10 hover:bg-cyan-400/20 text-cyan-300 border border-cyan-400/30 hover:border-cyan-400/50 text-sm transition-all cursor-pointer shadow-sm active:scale-95"
+                title="Install GoooG as Web App"
+                aria-label="Install GoooG as Web App"
+              >
+                <span>📲</span>
+              </button>
+            )}
 
             {/* Desktop: Train Now Button */}
             <Link
@@ -132,25 +150,6 @@ export default function App() {
                 <line x1="4" y1="18" x2="20" y2="18" />
               </svg>
             </button>
-
-            {/* PWA Install Header Button */}
-            {!isInstalled && (isInstallable || isIOS) && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (isInstallable && !isIOS) {
-                    promptInstall();
-                  } else {
-                    setIsGuideOpen(true);
-                  }
-                }}
-                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-400/10 hover:bg-cyan-400/20 text-cyan-300 border border-cyan-400/30 hover:border-cyan-400/50 text-xs font-mono font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
-                title="Install GoooG as Web App"
-              >
-                <span>📲</span>
-                <span>Install App</span>
-              </button>
-            )}
 
             <FullscreenButton variant="header" />
           </div>
