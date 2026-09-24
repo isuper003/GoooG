@@ -29,6 +29,58 @@ jobs:
         env:
           VITE_API_WRITE_SECRET: ${{ secrets.VITE_API_WRITE_SECRET }}
 
+      - name: Ensure D1 database exists and update wrangler.jsonc
+        run: |
+          node -e '
+            const fs = require("fs");
+            const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+            const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+
+            async function run() {
+              const listRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database`, {
+                headers: { Authorization: `Bearer ${apiToken}` }
+              });
+              const listData = await listRes.json();
+              if (!listData.success) {
+                throw new Error("Failed to list D1 databases: " + JSON.stringify(listData));
+              }
+              let db = listData.result?.find(d => d.name === "guess-the-character-db");
+              if (!db) {
+                console.log("Creating D1 database guess-the-character-db...");
+                const createRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database`, {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${apiToken}`,
+                    "Content-Type": "application/json"
+                  },
+                  body: JSON.stringify({ name: "guess-the-character-db" })
+                });
+                const createData = await createRes.json();
+                if (!createData.success) {
+                  throw new Error("Failed to create D1 database: " + JSON.stringify(createData));
+                }
+                db = createData.result;
+                console.log("Created D1 database:", db.uuid);
+              } else {
+                console.log("Found existing D1 database:", db.uuid);
+              }
+
+              const wranglerPath = "wrangler.jsonc";
+              let content = fs.readFileSync(wranglerPath, "utf-8");
+              content = content.replace(/"database_id":\s*"[^"]*"/, `"database_id": "${db.uuid}"`);
+              fs.writeFileSync(wranglerPath, content, "utf-8");
+              console.log("Updated wrangler.jsonc with database_id:", db.uuid);
+            }
+
+            run().catch(err => {
+              console.error(err);
+              process.exit(1);
+            });
+          '
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
       - name: Apply D1 migrations
         uses: cloudflare/wrangler-action@v4
         with:
