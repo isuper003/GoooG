@@ -29,7 +29,7 @@ jobs:
         env:
           VITE_API_WRITE_SECRET: ${{ secrets.VITE_API_WRITE_SECRET }}
 
-      - name: Ensure D1 database exists and update wrangler.jsonc
+      - name: Ensure D1 database and Pages project exist
         run: |
           node -e '
             const fs = require("fs");
@@ -37,6 +37,7 @@ jobs:
             const apiToken = process.env.CLOUDFLARE_API_TOKEN;
 
             async function run() {
+              // 1. Ensure D1 database exists
               const listRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database`, {
                 headers: { Authorization: `Bearer ${apiToken}` }
               });
@@ -65,11 +66,60 @@ jobs:
                 console.log("Found existing D1 database:", db.uuid);
               }
 
+              // 2. Update wrangler.jsonc with database_id
               const wranglerPath = "wrangler.jsonc";
               let content = fs.readFileSync(wranglerPath, "utf-8");
               content = content.replace(/"database_id":\s*"[^"]*"/, `"database_id": "${db.uuid}"`);
               fs.writeFileSync(wranglerPath, content, "utf-8");
               console.log("Updated wrangler.jsonc with database_id:", db.uuid);
+
+              // 3. Ensure Pages project exists and bind D1
+              const pagesRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects/gooogn`, {
+                headers: { Authorization: `Bearer ${apiToken}` }
+              });
+
+              const deploymentConfigs = {
+                production: {
+                  d1_databases: { DB: { id: db.uuid } },
+                  compatibility_date: "2026-09-17"
+                },
+                preview: {
+                  d1_databases: { DB: { id: db.uuid } },
+                  compatibility_date: "2026-09-17"
+                }
+              };
+
+              if (pagesRes.status === 404) {
+                console.log("Creating Pages project gooogn...");
+                const createPagesRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects`, {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${apiToken}`,
+                    "Content-Type": "application/json"
+                  },
+                  body: JSON.stringify({
+                    name: "gooogn",
+                    production_branch: "main",
+                    deployment_configs: deploymentConfigs
+                  })
+                });
+                const createPagesData = await createPagesRes.json();
+                console.log("Pages project created:", createPagesData.success, createPagesData.errors || "");
+              } else {
+                console.log("Updating existing Pages project binding...");
+                const patchPagesRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects/gooogn`, {
+                  method: "PATCH",
+                  headers: {
+                    Authorization: `Bearer ${apiToken}`,
+                    "Content-Type": "application/json"
+                  },
+                  body: JSON.stringify({
+                    deployment_configs: deploymentConfigs
+                  })
+                });
+                const patchPagesData = await patchPagesRes.json();
+                console.log("Pages project updated:", patchPagesData.success);
+              }
             }
 
             run().catch(err => {
