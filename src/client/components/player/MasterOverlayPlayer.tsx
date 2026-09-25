@@ -14,7 +14,7 @@ export interface MasterOverlayState {
   opacity: number;   // 0.1 to 1.0 (default 1.0)
   clickThrough: boolean; // default true (clicks pass through to video players below)
   fitMode?: FitMode;     // 'contain' (proportional letterbox) | 'cover' (fill mobile screen)
-  zoom?: number;         // 1.0 to 3.0 (default 1.0)
+  zoom?: number;         // 0.25 to 3.0 (default 1.0, supports zoom-out and zoom-in)
   panX?: number;         // -1 to 1 NDC offset (default 0)
   panY?: number;         // -1 to 1 NDC offset (default 0)
 }
@@ -125,23 +125,28 @@ export function computeCoverAndPan(
     }
   }
 
-  // Multiplier for zoom
+  // Multiplier for zoom (supports zoom-in > 1.0 and zoom-out < 1.0)
   scaleX *= zoom;
   scaleY *= zoom;
 
-  // Maximum pan allowable so edges do not uncover empty canvas
-  const maxPanX = Math.max(0, scaleX - 1.0);
-  const maxPanY = Math.max(0, scaleY - 1.0);
+  // Maximum pan allowable:
+  // When overflowed (scale > 1.0), edges can be moved until canvas boundary: (scale - 1.0)
+  // When zoomed out (zoom < 1.0), the shrunken quad can be moved within canvas: (1.0 - scale)
+  const maxPanX = scaleX > 1.0 ? scaleX - 1.0 : (zoom < 1.0 ? Math.max(0, 1.0 - scaleX) : 0);
+  const maxPanY = scaleY > 1.0 ? scaleY - 1.0 : (zoom < 1.0 ? Math.max(0, 1.0 - scaleY) : 0);
 
   return { scaleX, scaleY, maxPanX, maxPanY };
 }
+
+const MIN_OVERLAY_ZOOM = 0.25;
+const MAX_OVERLAY_ZOOM = 3.0;
 
 export default function MasterOverlayPlayer({
   state,
   onUpdateState,
 }: MasterOverlayPlayerProps) {
   const fitMode: FitMode = state.fitMode ?? 'contain';
-  const zoom = Math.max(1.0, state.zoom ?? 1.0);
+  const zoom = Math.max(MIN_OVERLAY_ZOOM, Math.min(MAX_OVERLAY_ZOOM, state.zoom ?? 1.0));
   const rawPanX = state.panX ?? 0;
   const rawPanY = state.panY ?? 0;
 
@@ -435,11 +440,11 @@ export default function MasterOverlayPlayer({
     if (state.clickThrough) return;
     e.preventDefault();
     const delta = -e.deltaY * 0.0015;
-    const nextZoom = Math.min(3.0, Math.max(1.0, zoom + delta));
+    const nextZoom = Math.min(MAX_OVERLAY_ZOOM, Math.max(MIN_OVERLAY_ZOOM, zoom + delta));
     const roundedZoom = Math.round(nextZoom * 100) / 100;
     onUpdateState({
       zoom: roundedZoom,
-      ...(roundedZoom === 1.0 ? { panX: 0, panY: 0 } : {}),
+      ...(Math.abs(roundedZoom - 1.0) < 0.01 ? { panX: 0, panY: 0 } : {}),
     });
     resetHideTimer();
   };
@@ -630,7 +635,7 @@ export default function MasterOverlayPlayer({
           className={`w-full h-full block ${
             state.clickThrough
               ? 'pointer-events-none'
-              : (zoom > 1.02 || fitMode === 'cover')
+              : (Math.abs(zoom - 1.0) > 0.02 || fitMode === 'cover')
               ? 'pointer-events-auto cursor-grab active:cursor-grabbing touch-none'
               : 'pointer-events-auto cursor-pointer'
           }`}
@@ -795,13 +800,13 @@ export default function MasterOverlayPlayer({
               <button
                 type="button"
                 onClick={() => {
-                  const newZoom = Math.max(1.0, Math.round((zoom - 0.1) * 10) / 10);
+                  const newZoom = Math.max(MIN_OVERLAY_ZOOM, Math.round((zoom - 0.1) * 10) / 10);
                   onUpdateState({
                     zoom: newZoom,
-                    ...(newZoom === 1.0 ? { panX: 0, panY: 0 } : {}),
+                    ...(Math.abs(newZoom - 1.0) < 0.01 ? { panX: 0, panY: 0 } : {}),
                   });
                 }}
-                disabled={zoom <= 1.0}
+                disabled={zoom <= MIN_OVERLAY_ZOOM}
                 className="w-6 h-6 rounded-md bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 text-white flex items-center justify-center text-xs font-bold transition-all shrink-0"
                 title="Zoom Out (-10%)"
               >
@@ -811,8 +816,8 @@ export default function MasterOverlayPlayer({
               {/* The Zoom Scroll Bar Slider */}
               <input
                 type="range"
-                min={1.0}
-                max={3.0}
+                min={MIN_OVERLAY_ZOOM}
+                max={MAX_OVERLAY_ZOOM}
                 step={0.05}
                 value={zoom}
                 onPointerDown={() => {
@@ -823,22 +828,25 @@ export default function MasterOverlayPlayer({
                   const val = parseFloat(e.target.value);
                   onUpdateState({
                     zoom: val,
-                    ...(val === 1.0 ? { panX: 0, panY: 0 } : {}),
+                    ...(Math.abs(val - 1.0) < 0.01 ? { panX: 0, panY: 0 } : {}),
                   });
                   resetHideTimer();
                 }}
                 className="flex-1 h-1.5 bg-white/20 hover:bg-white/30 rounded-lg appearance-none cursor-pointer accent-purple-400"
-                title="Zoom overlay video (1.0x to 3.0x)"
+                title="Zoom overlay video (0.25x to 3.0x)"
               />
 
               {/* Zoom In Step Button */}
               <button
                 type="button"
                 onClick={() => {
-                  const newZoom = Math.min(3.0, Math.round((zoom + 0.1) * 10) / 10);
-                  onUpdateState({ zoom: newZoom });
+                  const newZoom = Math.min(MAX_OVERLAY_ZOOM, Math.round((zoom + 0.1) * 10) / 10);
+                  onUpdateState({
+                    zoom: newZoom,
+                    ...(Math.abs(newZoom - 1.0) < 0.01 ? { panX: 0, panY: 0 } : {}),
+                  });
                 }}
-                disabled={zoom >= 3.0}
+                disabled={zoom >= MAX_OVERLAY_ZOOM}
                 className="w-6 h-6 rounded-md bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 text-white flex items-center justify-center text-xs font-bold transition-all shrink-0"
                 title="Zoom In (+10%)"
               >
@@ -846,12 +854,12 @@ export default function MasterOverlayPlayer({
               </button>
 
               {/* Numeric indicator */}
-              <span className="font-mono text-[11px] text-purple-300 font-bold shrink-0 w-9 text-center">
-                {zoom.toFixed(1)}x
+              <span className="font-mono text-[11px] text-purple-300 font-bold shrink-0 w-11 text-center">
+                {zoom < 1.0 ? zoom.toFixed(2) : zoom.toFixed(1)}x
               </span>
 
-              {/* Reset to 1.0x */}
-              {zoom > 1.02 && (
+              {/* Reset to 1.0x (shown when zoomed in or zoomed out) */}
+              {Math.abs(zoom - 1.0) > 0.02 && (
                 <button
                   type="button"
                   onClick={() => onUpdateState({ zoom: 1.0, panX: 0, panY: 0 })}
@@ -863,8 +871,8 @@ export default function MasterOverlayPlayer({
               )}
             </div>
 
-            {/* Right: Directional Pan Nudge Buttons (When zoomed or in cover mode) */}
-            {(zoom > 1.02 || fitMode === 'cover') && (
+            {/* Right: Directional Pan Nudge Buttons (When zoomed in, zoomed out, or in cover mode) */}
+            {(Math.abs(zoom - 1.0) > 0.02 || fitMode === 'cover') && (
               <div className="flex items-center gap-1 shrink-0 bg-white/5 px-1.5 py-0.5 rounded-lg border border-white/10">
                 <span className="text-[9px] font-mono text-white/50 hidden xs:inline">PAN:</span>
                 <button
