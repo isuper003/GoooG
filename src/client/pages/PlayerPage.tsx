@@ -79,6 +79,10 @@ const INITIAL_OVERLAY: MasterOverlayState = {
   feather: 0.04,
   opacity: 1,
   clickThrough: true,
+  fitMode: 'contain',
+  zoom: 1.0,
+  panX: 0,
+  panY: 0,
 };
 
 export default function PlayerPage() {

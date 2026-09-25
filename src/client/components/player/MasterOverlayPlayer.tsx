@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { PlaylistItem } from '../../types/playerTypes';
+import type { PlaylistItem, FitMode } from '../../types/playerTypes';
 
 export interface MasterOverlayState {
   playlist: PlaylistItem[]; // Holds at most 1 clip
@@ -13,6 +13,10 @@ export interface MasterOverlayState {
   feather: number;   // 0.01 to 0.10 (default 0.04)
   opacity: number;   // 0.1 to 1.0 (default 1.0)
   clickThrough: boolean; // default true (clicks pass through to video players below)
+  fitMode?: FitMode;     // 'contain' (proportional letterbox) | 'cover' (fill mobile screen)
+  zoom?: number;         // 1.0 to 3.0 (default 1.0)
+  panX?: number;         // -1 to 1 NDC offset (default 0)
+  panY?: number;         // -1 to 1 NDC offset (default 0)
 }
 
 interface MasterOverlayPlayerProps {
@@ -87,13 +91,72 @@ function createShader(gl: WebGLRenderingContext, type: number, source: string): 
   return shader;
 }
 
+// Compute WebGL scaling and boundary clamping for Contain vs Cover (Mobile full-bleed crop) and Zoom
+export function computeCoverAndPan(
+  canvasWidth: number,
+  canvasHeight: number,
+  videoWidth: number,
+  videoHeight: number,
+  fitMode: FitMode,
+  zoom: number
+) {
+  const canvasAspect = canvasWidth / (canvasHeight || 1);
+  const videoAspect = videoWidth / (videoHeight || 1);
+  let scaleX = 1.0;
+  let scaleY = 1.0;
+
+  if (fitMode === 'cover') {
+    // Fill screen completely (crop overflow, zero black letterbox bars on mobile)
+    if (canvasAspect > videoAspect) {
+      scaleX = 1.0;
+      scaleY = canvasAspect / videoAspect;
+    } else {
+      scaleX = videoAspect / canvasAspect;
+      scaleY = 1.0;
+    }
+  } else {
+    // Proportional letterbox (entire video frame contained)
+    if (canvasAspect > videoAspect) {
+      scaleX = videoAspect / canvasAspect;
+      scaleY = 1.0;
+    } else {
+      scaleX = 1.0;
+      scaleY = canvasAspect / videoAspect;
+    }
+  }
+
+  // Multiplier for zoom
+  scaleX *= zoom;
+  scaleY *= zoom;
+
+  // Maximum pan allowable so edges do not uncover empty canvas
+  const maxPanX = Math.max(0, scaleX - 1.0);
+  const maxPanY = Math.max(0, scaleY - 1.0);
+
+  return { scaleX, scaleY, maxPanX, maxPanY };
+}
+
 export default function MasterOverlayPlayer({
   state,
   onUpdateState,
 }: MasterOverlayPlayerProps) {
+  const fitMode: FitMode = state.fitMode ?? 'contain';
+  const zoom = Math.max(1.0, state.zoom ?? 1.0);
+  const rawPanX = state.panX ?? 0;
+  const rawPanY = state.panY ?? 0;
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Dragging & Panning state refs
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef<{
+    x: number;
+    y: number;
+    startPanX: number;
+    startPanY: number;
+  } | null>(null);
 
   // WebGL context & GL objects
   const glRef = useRef<WebGLRenderingContext | null>(null);
@@ -206,7 +269,7 @@ export default function MasterOverlayPlayer({
     };
   }, [initWebGL]);
 
-  // 3. WebGL Render Frame: Always Maintain Clean Proportional Fit (No crop / No distortion)
+  // 3. WebGL Render Frame: Support Mobile Fill/Cover, Zoom & Clamped Pan
   const drawFrame = useCallback(() => {
     const gl = glRef.current;
     const canvas = canvasRef.current;
@@ -225,25 +288,27 @@ export default function MasterOverlayPlayer({
       gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     }
 
-    // Always proportional letterboxing (contain)
-    let scaleX = 1.0;
-    let scaleY = 1.0;
     const videoWidth = video.videoWidth || 1920;
     const videoHeight = video.videoHeight || 1080;
-    const canvasAspect = canvas.width / (canvas.height || 1);
-    const videoAspect = videoWidth / (videoHeight || 1);
 
-    if (canvasAspect > videoAspect) {
-      scaleX = videoAspect / canvasAspect;
-    } else {
-      scaleY = canvasAspect / videoAspect;
-    }
+    const { scaleX, scaleY, maxPanX, maxPanY } = computeCoverAndPan(
+      canvas.width,
+      canvas.height,
+      videoWidth,
+      videoHeight,
+      fitMode,
+      zoom
+    );
+
+    // Clamp pan offsets within visible content bounds
+    const panX = Math.max(-maxPanX, Math.min(maxPanX, rawPanX));
+    const panY = Math.max(-maxPanY, Math.min(maxPanY, rawPanY));
 
     const positions = new Float32Array([
-      -scaleX, -scaleY,
-       scaleX, -scaleY,
-      -scaleX,  scaleY,
-       scaleX,  scaleY,
+      -scaleX + panX, -scaleY + panY,
+       scaleX + panX, -scaleY + panY,
+      -scaleX + panX,  scaleY + panY,
+       scaleX + panX,  scaleY + panY,
     ]);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, posBufferRef.current);
@@ -281,7 +346,103 @@ export default function MasterOverlayPlayer({
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-  }, [state.threshold, state.feather, state.opacity, state.isKeyingEnabled]);
+  }, [
+    state.threshold,
+    state.feather,
+    state.opacity,
+    state.isKeyingEnabled,
+    fitMode,
+    zoom,
+    rawPanX,
+    rawPanY,
+  ]);
+
+  // Pointer dragging handlers for interactive canvas panning
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (state.clickThrough) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    isDraggingRef.current = false;
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      startPanX: rawPanX,
+      startPanY: rawPanY,
+    };
+    resetHideTimer();
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!dragStartRef.current) return;
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    if (!canvas || !video) return;
+
+    const w = canvas.clientWidth || window.innerWidth;
+    const h = canvas.clientHeight || window.innerHeight;
+
+    const { maxPanX, maxPanY } = computeCoverAndPan(
+      w,
+      h,
+      video.videoWidth || 1920,
+      video.videoHeight || 1080,
+      fitMode,
+      zoom
+    );
+
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+
+    if (Math.hypot(dx, dy) > 4) {
+      isDraggingRef.current = true;
+    }
+
+    if (isDraggingRef.current && (maxPanX > 0 || maxPanY > 0)) {
+      const deltaPanX = (dx / w) * 2.0;
+      const deltaPanY = -(dy / h) * 2.0;
+
+      const targetX = dragStartRef.current.startPanX + deltaPanX;
+      const targetY = dragStartRef.current.startPanY + deltaPanY;
+
+      const clampedX = Math.max(-maxPanX, Math.min(maxPanX, targetX));
+      const clampedY = Math.max(-maxPanY, Math.min(maxPanY, targetY));
+
+      onUpdateState({ panX: clampedX, panY: clampedY });
+      resetHideTimer();
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (dragStartRef.current) {
+      try {
+        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch {
+        // ignore
+      }
+      const wasDragging = isDraggingRef.current;
+      dragStartRef.current = null;
+      isDraggingRef.current = false;
+
+      // Single click on interactive canvas toggles play/pause
+      if (!wasDragging && !state.clickThrough) {
+        onUpdateState({ isPlaying: !state.isPlaying });
+      }
+    }
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    if (state.clickThrough) return;
+    e.preventDefault();
+    const delta = -e.deltaY * 0.0015;
+    const nextZoom = Math.min(3.0, Math.max(1.0, zoom + delta));
+    const roundedZoom = Math.round(nextZoom * 100) / 100;
+    onUpdateState({
+      zoom: roundedZoom,
+      ...(roundedZoom === 1.0 ? { panX: 0, panY: 0 } : {}),
+    });
+    resetHideTimer();
+  };
 
   // Continuous animation frame loop
   useEffect(() => {
@@ -460,14 +621,18 @@ export default function MasterOverlayPlayer({
         {/* WebGL 100% True Transparent Canvas Layer */}
         <canvas
           ref={canvasRef}
-          onClick={() => {
-            if (!state.clickThrough) {
-              onUpdateState({ isPlaying: !state.isPlaying });
-            }
-          }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          onWheel={handleWheel}
           onDoubleClick={handleToggleFullscreen}
           className={`w-full h-full block ${
-            state.clickThrough ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'
+            state.clickThrough
+              ? 'pointer-events-none'
+              : (zoom > 1.02 || fitMode === 'cover')
+              ? 'pointer-events-auto cursor-grab active:cursor-grabbing touch-none'
+              : 'pointer-events-auto cursor-pointer'
           }`}
         />
 
@@ -490,8 +655,38 @@ export default function MasterOverlayPlayer({
             </span>
           </div>
 
-          {/* Right: Pass-Through, Transparency & Close */}
+          {/* Right: Crop/Fit, Pass-Through, Transparency & Close */}
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Fit / Mobile Crop Toggle */}
+            <button
+              type="button"
+              onClick={() =>
+                onUpdateState({
+                  fitMode: fitMode === 'cover' ? 'contain' : 'cover',
+                  panX: 0,
+                  panY: 0,
+                })
+              }
+              className={`px-2 py-1 rounded-lg font-mono text-[10px] transition-colors border flex items-center gap-1 ${
+                fitMode === 'cover'
+                  ? 'bg-purple-500/30 text-purple-200 border-purple-400/50'
+                  : 'bg-white/10 text-white/60 border-white/15 hover:text-white'
+              }`}
+              title={
+                fitMode === 'cover'
+                  ? 'Crop: Cover (Fills mobile screen without black bars)'
+                  : 'Fit: Contain (Proportional letterbox - shows full frame)'
+              }
+            >
+              <span>{fitMode === 'cover' ? '📱' : '📐'}</span>
+              <span className="hidden sm:inline">
+                {fitMode === 'cover' ? 'Crop (Fill)' : 'Fit (Contain)'}
+              </span>
+              <span className="sm:hidden">
+                {fitMode === 'cover' ? 'Cover' : 'Fit'}
+              </span>
+            </button>
+
             {/* Click-Through Toggle */}
             <button
               type="button"
@@ -504,7 +699,7 @@ export default function MasterOverlayPlayer({
               title={
                 state.clickThrough
                   ? 'Pass-Through ON: Clicks pass to players below'
-                  : 'Interactive: Clicking video pauses overlay'
+                  : 'Interactive: Drag on screen to pan, click to pause'
               }
             >
               <span>{state.clickThrough ? '🎯' : '👆'}</span>
@@ -565,6 +760,159 @@ export default function MasterOverlayPlayer({
             <span className="font-mono text-[10px] text-white/50 shrink-0 w-9">
               {formatTime(duration)}
             </span>
+          </div>
+
+          {/* Zoom Scroll Bar & Mobile Crop Bar */}
+          <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 px-2.5 py-1.5 bg-black/60 backdrop-blur-md rounded-xl border border-white/10">
+            {/* Left: Mobile Crop / Fit Mode Toggle */}
+            <button
+              type="button"
+              onClick={() =>
+                onUpdateState({
+                  fitMode: fitMode === 'cover' ? 'contain' : 'cover',
+                  panX: 0,
+                  panY: 0,
+                })
+              }
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold flex items-center gap-1 transition-all shrink-0 border shadow-sm ${
+                fitMode === 'cover'
+                  ? 'bg-purple-600/40 text-purple-200 border-purple-400/60 shadow-purple-500/20'
+                  : 'bg-white/5 text-white/60 border-white/10 hover:text-white hover:bg-white/10'
+              }`}
+              title={
+                fitMode === 'cover'
+                  ? 'Mode: Crop / Cover (Fills mobile screen without black bars)'
+                  : 'Mode: Proportional Fit (Letterbox / Contain full frame)'
+              }
+            >
+              <span>{fitMode === 'cover' ? '📱' : '📐'}</span>
+              <span>{fitMode === 'cover' ? 'Crop: Cover' : 'Fit: Contain'}</span>
+            </button>
+
+            {/* Center: Zoom Scroll Bar with - / + buttons and live multiplier */}
+            <div className="flex items-center gap-1.5 flex-1 min-w-[140px] max-w-full sm:max-w-[420px]">
+              {/* Zoom Out Step Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  const newZoom = Math.max(1.0, Math.round((zoom - 0.1) * 10) / 10);
+                  onUpdateState({
+                    zoom: newZoom,
+                    ...(newZoom === 1.0 ? { panX: 0, panY: 0 } : {}),
+                  });
+                }}
+                disabled={zoom <= 1.0}
+                className="w-6 h-6 rounded-md bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 text-white flex items-center justify-center text-xs font-bold transition-all shrink-0"
+                title="Zoom Out (-10%)"
+              >
+                −
+              </button>
+
+              {/* The Zoom Scroll Bar Slider */}
+              <input
+                type="range"
+                min={1.0}
+                max={3.0}
+                step={0.05}
+                value={zoom}
+                onPointerDown={() => {
+                  if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+                }}
+                onPointerUp={resetHideTimer}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  onUpdateState({
+                    zoom: val,
+                    ...(val === 1.0 ? { panX: 0, panY: 0 } : {}),
+                  });
+                  resetHideTimer();
+                }}
+                className="flex-1 h-1.5 bg-white/20 hover:bg-white/30 rounded-lg appearance-none cursor-pointer accent-purple-400"
+                title="Zoom overlay video (1.0x to 3.0x)"
+              />
+
+              {/* Zoom In Step Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  const newZoom = Math.min(3.0, Math.round((zoom + 0.1) * 10) / 10);
+                  onUpdateState({ zoom: newZoom });
+                }}
+                disabled={zoom >= 3.0}
+                className="w-6 h-6 rounded-md bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 text-white flex items-center justify-center text-xs font-bold transition-all shrink-0"
+                title="Zoom In (+10%)"
+              >
+                +
+              </button>
+
+              {/* Numeric indicator */}
+              <span className="font-mono text-[11px] text-purple-300 font-bold shrink-0 w-9 text-center">
+                {zoom.toFixed(1)}x
+              </span>
+
+              {/* Reset to 1.0x */}
+              {zoom > 1.02 && (
+                <button
+                  type="button"
+                  onClick={() => onUpdateState({ zoom: 1.0, panX: 0, panY: 0 })}
+                  className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-purple-500/30 hover:bg-purple-500/50 text-purple-200 border border-purple-400/40 transition-colors shrink-0"
+                  title="Reset Zoom to 1.0x and center"
+                >
+                  1x
+                </button>
+              )}
+            </div>
+
+            {/* Right: Directional Pan Nudge Buttons (When zoomed or in cover mode) */}
+            {(zoom > 1.02 || fitMode === 'cover') && (
+              <div className="flex items-center gap-1 shrink-0 bg-white/5 px-1.5 py-0.5 rounded-lg border border-white/10">
+                <span className="text-[9px] font-mono text-white/50 hidden xs:inline">PAN:</span>
+                <button
+                  type="button"
+                  onClick={() => onUpdateState({ panX: rawPanX + 0.08 })}
+                  className="w-5 h-5 rounded bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-[9px] flex items-center justify-center transition-colors"
+                  title="Pan Left"
+                >
+                  ◀
+                </button>
+                <div className="flex flex-col gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => onUpdateState({ panY: rawPanY - 0.08 })}
+                    className="w-5 h-2.5 rounded bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-[7px] flex items-center justify-center transition-colors"
+                    title="Pan Up"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateState({ panY: rawPanY + 0.08 })}
+                    className="w-5 h-2.5 rounded bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-[7px] flex items-center justify-center transition-colors"
+                    title="Pan Down"
+                  >
+                    ▼
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onUpdateState({ panX: rawPanX - 0.08 })}
+                  className="w-5 h-5 rounded bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-[9px] flex items-center justify-center transition-colors"
+                  title="Pan Right"
+                >
+                  ▶
+                </button>
+                {(rawPanX !== 0 || rawPanY !== 0) && (
+                  <button
+                    type="button"
+                    onClick={() => onUpdateState({ panX: 0, panY: 0 })}
+                    className="px-1 h-5 rounded bg-white/10 hover:bg-white/20 text-white/70 hover:text-white text-[9px] font-mono flex items-center justify-center transition-colors"
+                    title="Reset Pan"
+                  >
+                    ⌖
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Controls Row */}
@@ -657,7 +1005,36 @@ export default function MasterOverlayPlayer({
 
           {/* Subtitle Sensitivity Settings Sub-panel */}
           {isSettingsOpen && (
-            <div className="mt-1 pt-2 border-t border-white/10 grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs px-2 bg-black/75 rounded-xl p-2.5">
+            <div className="mt-1 pt-2 border-t border-white/10 grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-xs px-2 bg-black/75 rounded-xl p-2.5">
+              {/* Screen Fit (Mobile Crop) */}
+              <div className="flex items-center justify-between sm:justify-start gap-2">
+                <span className="text-white/70 text-[11px] shrink-0">Screen:</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onUpdateState({ fitMode: 'contain', panX: 0, panY: 0 })}
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
+                      fitMode === 'contain'
+                        ? 'bg-purple-500 text-white font-bold'
+                        : 'bg-white/10 text-white/60 hover:text-white'
+                    }`}
+                  >
+                    Fit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateState({ fitMode: 'cover', panX: 0, panY: 0 })}
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
+                      fitMode === 'cover'
+                        ? 'bg-purple-500 text-white font-bold'
+                        : 'bg-white/10 text-white/60 hover:text-white'
+                    }`}
+                  >
+                    Cover
+                  </button>
+                </div>
+              </div>
+
               {/* Threshold (Black Crush) */}
               <div className="flex items-center justify-between sm:justify-start gap-2">
                 <span className="text-white/70 text-[11px] shrink-0">Threshold:</span>
